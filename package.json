@@ -1,0 +1,14 @@
+{
+  "name": "openinsider-tests",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "playwright test",
+    "test:api": "playwright test tests/api-health.spec.ts",
+    "test:ui": "playwright test tests/ui-table.spec.ts",
+    "test:scraper": "playwright test tests/scraper-accuracy.spec.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@types/node": "^25.5.2"
+  }
+}
