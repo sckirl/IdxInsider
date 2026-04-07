@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, Date, DateTime, Numeric
+from sqlalchemy import Column, Integer, String, Float, Date, DateTime, Numeric, Boolean, Text
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql import func
 import datetime
 
 Base = declarative_base()
@@ -8,19 +9,24 @@ class InsiderTransaction(Base):
     __tablename__ = "insider_transactions"
 
     id = Column(Integer, primary_key=True, index=True)
-    date_reported = Column(Date, index=True)
-    trade_date = Column(Date)
-    ticker = Column(String, index=True)
-    insider_name = Column(String, index=True)
-    role = Column(String)
-    transaction_type = Column(String) # BUY / SELL
-    shares = Column(Numeric)
-    price = Column(Numeric)
-    value = Column(Numeric)
-    ownership_change = Column(Float)
+    ticker = Column(String(10), index=True)
+    issuer_name = Column(String(255))
+    insider_name = Column(String(255), index=True)
+    role = Column(String(100))
+    transaction_type = Column(String(20)) # BUY, SELL, GIFT, EXERCISE, INHERITANCE, OTHERS
+    shares = Column(Numeric(precision=20, scale=2))
+    price = Column(Numeric(precision=20, scale=2))
+    value = Column(Numeric(precision=30, scale=2))
+    date = Column(Date, index=True) # Actual transaction date
+    filing_date = Column(Date, index=True) # Date published on IDX
+    ownership_before = Column(Numeric(precision=20, scale=2))
+    ownership_after = Column(Numeric(precision=20, scale=2))
+    ownership_change_pct = Column(Float)
+    direct_ownership = Column(Boolean, default=True)
+    purpose = Column(Text)
+    source_url = Column(String(511), unique=True)
     score = Column(Integer, default=0)
-    source_url = Column(String)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     def __repr__(self):
         return f"<InsiderTransaction(ticker={self.ticker}, name={self.insider_name}, type={self.transaction_type})>"
