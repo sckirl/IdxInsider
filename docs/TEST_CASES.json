@@ -1,0 +1,36 @@
+[
+  {
+    "ticker": "BBCA",
+    "insider_name": "Jahja Setiaatmadja",
+    "role": "DIREKTUR",
+    "transaction_type": "BUY",
+    "shares": 10000,
+    "price": 9000,
+    "value": 90000000,
+    "date": "2023-10-01",
+    "filing_date": "2023-10-02",
+    "ownership_before": 1000000,
+    "ownership_after": 1010000,
+    "ownership_change_pct": 1.0,
+    "direct_ownership": true,
+    "purpose": "Investasi",
+    "source_url": "https://www.idx.co.id/filings/12345.pdf"
+  },
+  {
+    "ticker": "GOTO",
+    "insider_name": "Patrick Sugito Walujo",
+    "role": "DIREKTUR",
+    "transaction_type": "BUY",
+    "shares": 500000,
+    "price": 60,
+    "value": 30000000,
+    "date": "2023-10-05",
+    "filing_date": "2023-10-06",
+    "ownership_before": 50000000,
+    "ownership_after": 50500000,
+    "ownership_change_pct": 1.0,
+    "direct_ownership": true,
+    "purpose": "Investasi",
+    "source_url": "https://www.idx.co.id/filings/67890.pdf"
+  }
+]
