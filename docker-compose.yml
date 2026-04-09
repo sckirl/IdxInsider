@@ -17,9 +17,12 @@ services:
     build: ./backend
     container_name: openinsider-backend
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/backend
     environment:
-      DATABASE_URL: postgresql://user:password@db:5432/openinsider
+      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@db:5432/openinsider}
+      ALLOWED_ORIGINS: "http://${SERVER_IP:-localhost}:${FRONTEND_PORT:-6969},http://localhost:6969"
     depends_on:
       - db
 
@@ -27,9 +30,13 @@ services:
     build: ./frontend
     container_name: openinsider-frontend
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-6969}:6969"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      - NEXT_PUBLIC_API_URL=${API_BASE_URL:-http://localhost:8000}
     depends_on:
       - backend
 

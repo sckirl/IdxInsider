@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const BACKEND_URL = 'http://localhost:8000';
+const BACKEND_URL = 'http://localhost:6969';
 const TEST_CASES_PATH = path.resolve(__dirname, '../docs/TEST_CASES.json');
 
 test('Scraper Integration: Database matches TEST_CASES.json', async ({ request }) => {

@@ -18,7 +18,7 @@ def normalize_role(role_str: str) -> str:
         return "PEMEGANG_SAHAM_UTAMA"
     return "OTHERS"
 
-def calculate_score(transaction: Dict[str, Any]) -> int:
+def calculate_score(transaction: Dict[str, Any], db=None) -> int:
     """
     Implements the Smart Scoring System as defined in DATA_SCHEMA.md.
     """
@@ -26,6 +26,11 @@ def calculate_score(transaction: Dict[str, Any]) -> int:
     t_type = str(transaction.get("transaction_type", "BUY")).upper()
     role = normalize_role(transaction.get("role", ""))
     value = float(transaction.get("value", 0))
+    ticker = transaction.get("ticker", "")
+    t_date = transaction.get("date")
+
+    if t_type == "GIFT":
+        return 0
 
     if t_type == "BUY":
         # Role Weight
@@ -55,6 +60,32 @@ def calculate_score(transaction: Dict[str, Any]) -> int:
         # Bonus Modifiers
         if transaction.get("direct_ownership", True):
             score += 1
+            
+        if transaction.get("ownership_change_pct", 0) > 0.1:
+            score += 2
+        
+        # Cluster Buy Logic
+        if db and ticker and t_date:
+            from .models import InsiderTransaction
+            import datetime
+            seven_days_ago = t_date - datetime.timedelta(days=7)
+            
+            # Count distinct insiders who bought this ticker in the last 7 days
+            other_insiders_count = db.query(InsiderTransaction.insider_name).filter(
+                InsiderTransaction.ticker == ticker,
+                InsiderTransaction.transaction_type == "BUY",
+                InsiderTransaction.date >= seven_days_ago,
+                InsiderTransaction.date <= t_date,
+                InsiderTransaction.insider_name != transaction.get("insider_name")
+            ).distinct().count()
+            
+            # Total unique insiders including the current one
+            total_insiders = other_insiders_count + 1
+            
+            if total_insiders >= 3:
+                score += 5
+            elif total_insiders == 2:
+                score += 3
             
     elif t_type == "SELL":
         score -= 2

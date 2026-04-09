@@ -1,0 +1,66 @@
+graph TD
+    %% Global Styles
+    classDef supervisor fill:#6a1b9a,stroke:#4a148c,color:#fff,stroke-width:4px;
+    classDef pm fill:#fbc02d,stroke:#f57f17,color:#000,font-weight:bold;
+    classDef ba fill:#0277bd,stroke:#01579b,color:#fff;
+    classDef dev fill:#2e7d32,stroke:#1b5e20,color:#fff;
+    classDef qa fill:#c62828,stroke:#b71c1c,color:#fff;
+    classDef infrastructure fill:#37474f,stroke:#263238,color:#fff,stroke-dasharray: 5 5;
+
+    subgraph User_Interface [External Interaction]
+        User((User/Owner))
+        ProdURL[pukat-master:6969]
+    end
+
+    subgraph Control_Plane [Command & Control]
+        Supervisor[Gemini CLI / Senior Architect]:::supervisor
+        PM[Project Manager Agent]:::pm
+    end
+
+    subgraph Intelligence_Layer [Data & Logic Design]
+        BA[Business Analyst Agent]:::ba
+    end
+
+    subgraph Execution_Core [Engineering & Deployment]
+        DEV[Developer Agent]:::dev
+        IDX_API[(IDX 2026 API)]
+    end
+
+    subgraph Validation_Layer [Quality & Resilience]
+        QA[QA Engineer Agent]:::qa
+    end
+
+    %% Workflow Flow
+    User -->|Objectives| Supervisor
+    Supervisor -->|Directives| PM
+    PM -->|Features & Milestones| BA
+    BA -->|Data Schema & Scoring Logic| DEV
+    DEV -->|Builds API/UI/Scrapers| QA
+    QA -->|Chaos/UAT Reports| Supervisor
+
+    %% Intervention Loops (The 'Senior Architect' Dynamic)
+    Supervisor -.->|Fire/Hire/Audit| DEV
+    Supervisor -.->|Infrastructure Fixes| Docker[Docker Compose / .env]:::infrastructure
+    Supervisor -.->|Audit Wrongdoings| Codebase[(Codebase Integrity)]
+
+    %% Working Dynamic Details
+    DEV <-->|Real-time Ingestion| IDX_API
+    DEV -->|Hot Reload| ProdURL
+    QA -->|Stress Tests| ProdURL
+    
+    %% Specific Agent Duties
+    subgraph Agent_Duties [Internal Working Dynamic]
+        direction LR
+        PM_D[Roadmap / UX / Approval]:::pm
+        BA_D[OCR Research / Cluster Logic]:::ba
+        DEV_D[FastAPI / Next.js / Playwright]:::dev
+        QA_D[Chaos / Mobile / Connectivity]:::qa
+    end
+
+    %% Legend
+    legend[Orchestration Flow]
+    Supervisor --- legend
+    legend --- PM
+    legend --- BA
+    legend --- DEV
+    legend --- QA

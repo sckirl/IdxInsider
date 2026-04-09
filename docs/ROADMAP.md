@@ -1,28 +1,32 @@
-# IDX OpenInsider ROADMAP
+# IDX OpenInsider ROADMAP (Updated April 2026)
 
-## Milestone 1: Data Ingestion (MVP)
-- [ ] Research IDX Keterbukaan Informasi URLs (BA)
-- [ ] Implement PDF/HTML scraper for "Laporan Kepemilikan Saham" (DEV)
-- [ ] Store extracted data in PostgreSQL (DEV)
-- [ ] Validate data accuracy (QA)
+## Milestone 1: Data Ingestion & Recency (BA/DEV)
+- [x] Research IDX Keterbukaan Informasi URLs (BA)
+- [x] Implement PDF/HTML scraper for "Laporan Kepemilikan Saham" (DEV)
+- [ ] **Data Recency Upgrade:** Target April 2026 filings specifically (BA/DEV)
+- [ ] Clean and normalize messy Indonesian disclosure text (DEV)
+- [x] Store extracted data in PostgreSQL (DEV)
 
-## Milestone 2: Backend API
-- [ ] Build FastAPI endpoints: `/insider/latest`, `/insider/top-buy` (DEV)
-- [ ] Implement Smart Scoring logic (BA/DEV)
+## Milestone 2: Intelligence & Logic (BA/DEV)
+- [x] Build FastAPI endpoints: `/insider/latest`, `/insider/top-buy` (DEV)
+- [x] Implement Smart Scoring logic (BA/DEV)
+- [ ] **Cluster Buy Detection:** Logic for 2+ insiders in 7 days (BA/DEV)
 - [ ] API documentation (Swagger) (DEV)
 
-## Milestone 3: Frontend Dashboard
-- [ ] Scaffold Next.js project with TailwindCSS (DEV)
-- [ ] Implement real-time table for insider transactions (DEV)
-- [ ] Search and filtering by ticker/role (DEV)
-- [ ] Dark-mode financial terminal UI (DEV)
+## Milestone 3: Web Layer & Terminal UI (DEV)
+- [x] Scaffold Next.js project with TailwindCSS (DEV)
+- [x] Implement real-time table for insider transactions (DEV)
+- [x] Dark-mode financial terminal UI (DEV)
+- [ ] **Advanced Interactivity:** Search, Filters, and Real-time polling (DEV)
 
-## Milestone 4: Integration & Quality
-- [ ] Full integration testing (QA)
-- [ ] Docker containerization and optimization (DEV)
-- [ ] Performance benchmarking (QA)
+## Milestone 4: Rigorous QA & Certifications (QA)
+- [ ] **Certification A: Unit Testing** (Scraper patterns, Scoring math)
+- [ ] **Certification B: Integration Testing** (Backend-DB, Frontend-API)
+- [ ] **Certification C: Data Recency Testing** (Verification of April 2026 data)
+- [ ] **Certification D: System & Load Testing**
+- [ ] **Certification E: User Acceptance Testing (UAT)**
 
-## Milestone 5: Launch & Polish
-- [ ] Final UI/UX refinements (PM/DEV)
-- [ ] Automated testing pipelines (QA)
-- [ ] Deployment-ready Docker orchestration (DEV)
+## Milestone 5: Final Delivery
+- [ ] PM Approval of all QA Certifications
+- [ ] Production-ready Docker orchestration
+- [ ] Deployment to pukat-master:6969

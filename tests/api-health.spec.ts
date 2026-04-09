@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const BACKEND_URL = 'http://localhost:8000';
+const BACKEND_URL = 'http://localhost:6969';
 const FRONTEND_URL = 'http://localhost:3000';
 
 test('Backend API health check', async ({ request }) => {

@@ -14,13 +14,13 @@ class InsiderTransaction(Base):
     insider_name = Column(String(255), index=True)
     role = Column(String(100))
     transaction_type = Column(String(20)) # BUY, SELL, GIFT, EXERCISE, INHERITANCE, OTHERS
-    shares = Column(Numeric(precision=20, scale=2))
-    price = Column(Numeric(precision=20, scale=2))
-    value = Column(Numeric(precision=30, scale=2))
+    shares = Column(Float)
+    price = Column(Float)
+    value = Column(Float)
     date = Column(Date, index=True) # Actual transaction date
     filing_date = Column(Date, index=True) # Date published on IDX
-    ownership_before = Column(Numeric(precision=20, scale=2))
-    ownership_after = Column(Numeric(precision=20, scale=2))
+    ownership_before = Column(Float)
+    ownership_after = Column(Float)
     ownership_change_pct = Column(Float)
     direct_ownership = Column(Boolean, default=True)
     purpose = Column(Text)
