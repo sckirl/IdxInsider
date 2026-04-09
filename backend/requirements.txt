@@ -17,7 +17,8 @@ pytesseract
 pdf2image
 Pillow
 playwright==1.41.2
-openbb
-# openbb-sectors==1.1.2 removed due to availability issues
+yfinance
+# openbb removed due to availability issues
+
 
 

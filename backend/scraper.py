@@ -6,7 +6,7 @@ from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from .database import SessionLocal
 from .models import InsiderTransaction
-from .utils import normalize_role, calculate_score
+from .utils import normalize_role, calculate_score, get_market_metadata
 import pdfplumber
 import io
 import re
@@ -21,7 +21,8 @@ obb = None
 # Final correct IDX API URL
 IDX_API_URL = "https://www.idx.co.id/primary/ListedCompany/GetAnnouncement"
 KEYWORDS = [
-    "Laporan Kepemilikan"
+    "Laporan Kepemilikan",
+    "Informasi Hasil Pelaksanaan Pembelian Kembali Saham"
 ]
 
 def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -> List[Dict[str, Any]]:
@@ -177,9 +178,23 @@ def run_scraper(full_year=False):
                                     pdf_bytes = pdf_response.body()
                                     filing_date = disc.get("TglPengumuman")
                                     parsed_transactions = parse_pdf_content(pdf_bytes, pdf_url, filing_date)
-                                    
+
+                                    # Check if this is a buyback announcement
+                                    is_buyback_announcement = "Pembelian Kembali" in (disc.get("JudulPengumuman") or "")
+
                                     for t_data in parsed_transactions:
-                                        t_data["score"] = calculate_score(t_data, db=db)
+                                        t_data["is_buyback"] = is_buyback_announcement
+                                        # Fetch market metadata (RVOL, etc.)
+                                        market_meta = get_market_metadata(t_data["ticker"])
+
+                                        t_data["rvol"] = market_meta["rvol"]
+                                        t_data["price_history"] = json.dumps(market_meta["price_history"])
+                                        
+                                        # Calculate score with breakdown
+                                        score, reasons = calculate_score(t_data, db=db)
+                                        t_data["score"] = score
+                                        t_data["score_reasons"] = json.dumps(reasons)
+                                        
                                         transaction = InsiderTransaction(**t_data)
                                         db.add(transaction)
                                     db.commit()

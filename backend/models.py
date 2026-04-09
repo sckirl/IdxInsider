@@ -26,6 +26,11 @@ class InsiderTransaction(Base):
     purpose = Column(Text)
     source_url = Column(String(511), unique=True)
     score = Column(Integer, default=0)
+    score_reasons = Column(Text) # JSON string of reasons
+    rvol = Column(Float) # Relative Volume
+    is_buyback = Column(Boolean, default=False)
+    insider_win_rate = Column(Float) # Success rate percentage
+    price_history = Column(Text) # JSON string of last 5 days
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     def __repr__(self):

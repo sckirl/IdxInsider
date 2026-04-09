@@ -13,6 +13,10 @@ interface InsiderTransaction {
   price: string | number;
   value: string | number;
   score: number;
+  score_reasons?: string; // JSON string
+  rvol?: number;
+  is_buyback?: boolean;
+  price_history?: string; // JSON array
 }
 
 interface ClusterGroup {
@@ -173,8 +177,10 @@ export default function Home() {
           </div>
         )}
 
-        {loading ? (
-          <div className="py-20 text-center text-[#8B949E] animate-pulse">Loading intelligence...</div>
+        {loading && (data.length === 0 && clusters.length === 0) ? (
+          <div className="py-20 text-center text-[#8B949E] animate-pulse text-lg">
+            📡 Synchronizing Institutional Intelligence...
+          </div>
         ) : error ? (
           <div className="bg-red-900/10 border border-red-500/50 text-red-400 p-6 rounded-lg text-center">
             <p className="font-medium">Connection Error: {error}</p>
@@ -190,58 +196,92 @@ export default function Home() {
                   <th className="p-3 font-semibold text-[#8B949E]">Insider Name</th>
                   <th className="p-3 font-semibold text-[#8B949E]">Role</th>
                   <th className="p-3 font-semibold text-[#8B949E]">Action</th>
-                  <th className="p-3 font-semibold text-[#8B949E] text-right">Shares</th>
                   <th className="p-3 font-semibold text-[#8B949E] text-right">Value (IDR)</th>
+                  <th className="p-3 font-semibold text-[#8B949E] text-center">RVOL</th>
                   <th className="p-3 font-semibold text-[#8B949E] text-center">Score</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#30363D]">
-                {filteredData.map((row) => (
-                  <tr key={row.id} className="hover:bg-[#1C2128]">
-                    <td className="p-3 text-[#8B949E] whitespace-nowrap">{row.date}</td>
-                    <td className="p-3 font-bold text-blue-400">{row.ticker}</td>
-                    <td className="p-3 font-medium text-[#F0F6FC]">{row.insider_name}</td>
-                    <td className="p-3 text-[10px] text-[#8B949E] uppercase tracking-wider">{row.role?.replace('_', ' ')}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${
-                        row.transaction_type === 'BUY' ? 'text-green-400 bg-green-400/10 border border-green-400/20' : 'text-red-400 bg-red-400/10 border border-red-400/20'
-                      }`}>{row.transaction_type}</span>
-                    </td>
-                    <td className="p-3 text-right tabular-nums text-[#8B949E]">{formatNumber(row.shares)}</td>
-                    <td className="p-3 text-right font-mono text-[#F0F6FC]">{formatNumber(row.value)}</td>
-                    <td className="p-3 text-center">
-                      <span className={`w-6 h-6 inline-flex items-center justify-center rounded-full text-[10px] font-bold ${
-                        row.score >= 5 ? 'bg-green-600 text-white' : 'bg-[#30363D] text-[#8B949E]'
-                      }`}>{row.score > 0 ? `+${row.score}` : row.score}</span>
-                    </td>
-                  </tr>
-                ))}
+                {filteredData.map((row) => {
+                  const reasons = row.score_reasons ? JSON.parse(row.score_reasons) : [];
+                  return (
+                    <tr key={row.id} className="hover:bg-[#1C2128] transition-colors group">
+                      <td className="p-3 text-[#8B949E] whitespace-nowrap">{row.date}</td>
+                      <td className="p-3">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-blue-400">{row.ticker}</span>
+                          {row.is_buyback && (
+                            <span className="text-[8px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1 rounded-sm mt-1 w-fit font-bold">
+                              BUYBACK
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-3 font-medium text-[#F0F6FC]">{row.insider_name}</td>
+                      <td className="p-3 text-[10px] text-[#8B949E] uppercase tracking-wider">{row.role?.replace('_', ' ')}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${
+                          row.transaction_type === 'BUY' ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'
+                        }`}>{row.transaction_type}</span>
+                      </td>
+                      <td className="p-3 text-right font-mono text-[#F0F6FC]">{formatNumber(row.value)}</td>
+                      <td className="p-3 text-center">
+                        {row.rvol && (
+                          <span className={`text-[10px] font-bold ${row.rvol >= 2 ? 'text-orange-400' : 'text-[#8B949E]'}`}>
+                            {row.rvol}x
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        <div className="relative inline-block group/tooltip">
+                          <span className={`w-6 h-6 inline-flex items-center justify-center rounded-full text-[10px] font-bold cursor-help transition-all ${
+                            row.score >= 5 ? 'bg-green-600 text-white shadow-[0_0_8px_rgba(22,163,74,0.4)]' : 'bg-[#30363D] text-[#8B949E]'
+                          }`}>
+                            {row.score > 0 ? `+${row.score}` : row.score}
+                          </span>
+                          
+                          {/* Tooltip */}
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-[#21262D] border border-[#30363D] p-2 rounded-md shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-20 pointer-events-none">
+                            <p className="text-[10px] font-bold text-white mb-1 border-b border-[#30363D] pb-1">Score Breakdown</p>
+                            <ul className="space-y-1">
+                              {reasons.map((r: string, i: number) => (
+                                <li key={i} className="text-[9px] text-[#8B949E] flex justify-between">
+                                  <span>{r}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {clusters.map((cluster) => (
-              <div key={cluster.ticker} className="bg-[#161B22] border border-[#30363D] rounded-lg overflow-hidden flex flex-col">
+              <div key={cluster.ticker} className="bg-[#161B22] border border-[#30363D] rounded-lg overflow-hidden flex flex-col hover:border-blue-500/50 transition-colors">
                 <div className="p-4 border-b border-[#30363D] flex justify-between items-start bg-[#0D1117]">
                   <div>
                     <h3 className="text-xl font-bold text-blue-400">{cluster.ticker}</h3>
-                    <p className="text-[10px] text-[#8B949E] uppercase tracking-widest mt-1">Cluster Buy Signal</p>
+                    <p className="text-[10px] text-[#8B949E] uppercase tracking-widest mt-1">High-Conviction Accumulation</p>
                   </div>
                   <div className="text-right">
                     <span className="bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-1 rounded-md text-xs font-bold">
-                      {cluster.insider_count} Insiders
+                      {cluster.insider_count} unique buyers
                     </span>
-                    <p className="text-[10px] text-[#8B949E] mt-2">Last: {cluster.last_date}</p>
+                    <p className="text-[10px] text-[#8B949E] mt-2">Latest: {cluster.last_date}</p>
                   </div>
                 </div>
                 <div className="p-4 flex-1">
                   <div className="flex justify-between mb-4">
-                    <span className="text-[#8B949E]">Total Accumulation:</span>
+                    <span className="text-[#8B949E]">30D Total Value:</span>
                     <span className="font-mono text-[#F0F6FC] font-bold">IDR {formatNumber(cluster.total_value)}</span>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-[10px] font-bold text-[#8B949E] uppercase">Involved Insiders:</p>
+                    <p className="text-[10px] font-bold text-[#8B949E] uppercase">Participating Insiders:</p>
                     <div className="flex flex-wrap gap-1">
                       {cluster.insiders.map(name => (
                         <span key={name} className="bg-[#30363D] text-[#C9D1D9] px-2 py-0.5 rounded text-[10px]">{name}</span>
@@ -249,16 +289,23 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-                <div className="p-2 bg-[#0D1117]/50 border-t border-[#30363D]">
+                <div className="p-2 bg-[#0D1117]/50 border-t border-[#30363D] flex gap-2">
                    <button 
                     onClick={() => {
                       setSearchTerm(cluster.ticker);
                       setViewMode('recent');
                     }}
-                    className="w-full text-[10px] text-blue-400 hover:underline py-1"
+                    className="flex-1 bg-blue-600/10 text-blue-400 text-[10px] font-bold py-2 rounded hover:bg-blue-600/20"
                    >
-                     View detailed activity →
+                     INSPECT TRANSACTIONS
                    </button>
+                   <a 
+                    href={`https://stockbit.com/symbol/${cluster.ticker}`}
+                    target="_blank"
+                    className="bg-[#21262D] text-[#C9D1D9] text-[10px] font-bold px-3 py-2 rounded hover:bg-[#30363D]"
+                   >
+                     TRADE ↗
+                   </a>
                 </div>
               </div>
             ))}
