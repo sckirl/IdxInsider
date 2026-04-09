@@ -33,10 +33,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-async def run_scraper_async():
+async def run_scraper_async(full_year=False):
     try:
-        print("Background Task: Running scraper...")
-        await asyncio.to_thread(run_scraper)
+        print(f"Background Task: Running scraper (full_year={full_year})...")
+        await asyncio.to_thread(run_scraper, full_year=full_year)
         print("Background Task: Scraper finished.")
     except Exception as e:
         print(f"Background Task Error: {e}")

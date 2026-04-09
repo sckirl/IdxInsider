@@ -241,12 +241,12 @@ export default function Home() {
                           </span>
                           
                           {/* Tooltip */}
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-[#21262D] border border-[#30363D] p-2 rounded-md shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-20 pointer-events-none">
-                            <p className="text-[10px] font-bold text-white mb-1 border-b border-[#30363D] pb-1">Score Breakdown</p>
-                            <ul className="space-y-1">
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-56 bg-[#21262D] border border-[#30363D] p-3 rounded-lg shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 pointer-events-none">
+                            <p className="text-[10px] font-bold text-white mb-2 border-b border-[#30363D] pb-1 uppercase tracking-tighter">Conviction Breakdown</p>
+                            <ul className="space-y-1.5">
                               {reasons.map((r: string, i: number) => (
-                                <li key={i} className="text-[9px] text-[#8B949E] flex justify-between">
-                                  <span>{r}</span>
+                                <li key={i} className="text-[10px] text-[#8B949E] flex justify-between gap-4">
+                                  <span className="text-left">{r}</span>
                                 </li>
                               ))}
                             </ul>

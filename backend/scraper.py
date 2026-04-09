@@ -2,7 +2,7 @@ import requests
 import json
 import time
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from sqlalchemy.orm import Session
 from .database import SessionLocal
 from .models import InsiderTransaction
@@ -13,6 +13,8 @@ import re
 import pytesseract
 from pdf2image import convert_from_bytes
 from PIL import Image
+import concurrent.futures
+import multiprocessing
 
 from playwright.sync_api import sync_playwright
 
@@ -26,6 +28,9 @@ KEYWORDS = [
 ]
 
 def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -> List[Dict[str, Any]]:
+    """
+    CPU-Bound Task: Extract text and parse transactions.
+    """
     transactions = []
     try:
         full_text = ""
@@ -33,6 +38,7 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
             for page in pdf.pages:
                 full_text += page.extract_text() or ""
         
+        # If text extraction fails, use OCR
         if len(full_text.strip()) < 50:
             try:
                 images = convert_from_bytes(pdf_bytes)
@@ -42,7 +48,6 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
         
         if not full_text: return []
 
-        # Improved Ticker extraction
         ticker_match = re.search(r"([A-Z]{4})\.JK", full_text)
         if not ticker_match:
             ticker_match = re.search(r"\(([A-Z]{4})\)", full_text)
@@ -102,10 +107,6 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
                 "value": float((shares or 0) * (price or 0)),
                 "date": t_date,
                 "filing_date": datetime.strptime(filing_date_str.split("T")[0], "%Y-%m-%d").date() if filing_date_str else datetime.now().date(),
-                "ownership_before": 0,
-                "ownership_after": 0,
-                "ownership_change_pct": 0,
-                "purpose": "",
                 "source_url": source_url
             })
     except Exception as e:
@@ -113,21 +114,43 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
     
     return transactions
 
+def process_single_disclosure(pdf_info: Tuple[str, str, str]) -> List[Dict[str, Any]]:
+    """
+    Worker function for ProcessPoolExecutor.
+    Downloads and parses a single PDF.
+    """
+    pdf_url, filing_date, judul = pdf_info
+    
+    # Internal Download (I/O)
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        response = requests.get(pdf_url, headers=headers, timeout=30)
+        if response.status_code != 200: return []
+        pdf_bytes = response.content
+        
+        parsed = parse_pdf_content(pdf_bytes, pdf_url, filing_date)
+        is_buyback = "Pembelian Kembali" in (judul or "")
+        
+        for t in parsed:
+            t["is_buyback"] = is_buyback
+            
+        return parsed
+    except:
+        return []
+
 def run_scraper(full_year=False):
-    print(f"Starting scraper at {datetime.now()} (Full Year: {full_year})")
+    print(f"Starting High-Performance Scraper at {datetime.now()} (Full Year: {full_year})")
     db = SessionLocal()
     
+    # 1. Fetch List (Serial Playwright - anti-bot mitigation)
+    all_disclosures = []
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
-        )
+        context = browser.new_context(user_agent="Mozilla/5.0")
         page = context.new_page()
         
         try:
             page.goto("https://www.idx.co.id/id/perusahaan-tercatat/keterbukaan-informasi/", wait_until="networkidle")
-            
-            # For 2026 full year, we start from today and go back
             date_to = datetime.now().strftime("%Y%m%d")
             date_from = "20260101"
             
@@ -137,86 +160,76 @@ def run_scraper(full_year=False):
             
             while has_more:
                 import urllib.parse
-                params = {
-                    "kodeEmiten": "",
-                    "emitenType": "*",
-                    "indexFrom": index_from,
-                    "pageSize": page_size,
-                    "dateFrom": date_from,
-                    "dateTo": date_to,
-                    "lang": "id",
-                    "keyword": "Laporan Kepemilikan"
-                }
+                params = {"kodeEmiten": "", "emitenType": "*", "indexFrom": index_from, "pageSize": page_size, 
+                          "dateFrom": date_from, "dateTo": date_to, "lang": "id", "keyword": "Laporan Kepemilikan"}
                 api_url = f"{IDX_API_URL}?{urllib.parse.urlencode(params)}"
-                print(f"Fetching page {index_from // page_size + 1}: {api_url}")
+                print(f"Fetching List Page {index_from // page_size + 1}")
                 
                 response = page.goto(api_url, wait_until="networkidle")
                 if response and response.status == 200:
                     data = json.loads(page.inner_text("body"))
                     replies = data.get("Replies", [])
-                    
-                    if not replies:
-                        has_more = False
-                        break
-                        
-                    print(f"Processing {len(replies)} items from page...")
-                    for disc_item in replies:
-                        disc = disc_item.get("pengumuman", {})
-                        attachments = disc_item.get("attachments", [])
-                        
-                        for att in attachments:
-                            pdf_url = att.get("FullSavePath")
-                            if not pdf_url: continue
-                            
-                            existing = db.query(InsiderTransaction).filter(InsiderTransaction.source_url == pdf_url).first()
-                            if existing: continue
-                            
-                            print(f"Downloading PDF: {pdf_url}")
-                            try:
-                                pdf_response = context.request.get(pdf_url, timeout=60000)
-                                if pdf_response.status == 200:
-                                    pdf_bytes = pdf_response.body()
-                                    filing_date = disc.get("TglPengumuman")
-                                    parsed_transactions = parse_pdf_content(pdf_bytes, pdf_url, filing_date)
-
-                                    # Check if this is a buyback announcement
-                                    is_buyback_announcement = "Pembelian Kembali" in (disc.get("JudulPengumuman") or "")
-
-                                    for t_data in parsed_transactions:
-                                        t_data["is_buyback"] = is_buyback_announcement
-                                        # Fetch market metadata (RVOL, etc.)
-                                        market_meta = get_market_metadata(t_data["ticker"])
-
-                                        t_data["rvol"] = market_meta["rvol"]
-                                        t_data["price_history"] = json.dumps(market_meta["price_history"])
-                                        
-                                        # Calculate score with breakdown
-                                        score, reasons = calculate_score(t_data, db=db)
-                                        t_data["score"] = score
-                                        t_data["score_reasons"] = json.dumps(reasons)
-                                        
-                                        transaction = InsiderTransaction(**t_data)
-                                        db.add(transaction)
-                                    db.commit()
-                                else:
-                                    print(f"Failed PDF: {pdf_url} ({pdf_response.status})")
-                            except Exception as pdf_err:
-                                print(f"Error PDF {pdf_url}: {pdf_err}")
-                            time.sleep(0.5)
-                    
+                    if not replies: break
+                    all_disclosures.extend(replies)
                     index_from += page_size
-                    if not full_year: has_more = False # Only one page if not full year
-                else:
-                    has_more = False
-                    
-        except Exception as e:
-            print(f"Error in scraper loop: {e}")
-            db.rollback()
+                    if not full_year: break
+                else: break
         finally:
             browser.close()
-            db.close()
+
+    print(f"List Fetch Complete. Total Disclosures: {len(all_disclosures)}")
+
+    # 2. Filter for New Items
+    to_process = []
+    for item in all_disclosures:
+        disc = item.get("pengumuman", {})
+        attachments = item.get("attachments", [])
+        for att in attachments:
+            url = att.get("FullSavePath")
+            if url:
+                existing = db.query(InsiderTransaction).filter(InsiderTransaction.source_url == url).first()
+                if not existing:
+                    to_process.append((url, disc.get("TglPengumuman"), disc.get("JudulPengumuman")))
+
+    print(f"Items to Parse: {len(to_process)}")
+
+    # 3. Parallel Processing (CPU-Bound OCR & Parsing)
+    # Using 75% of available cores to avoid locking the system
+    num_workers = max(1, multiprocessing.cpu_count() - 1)
+    results_list = []
+    
+    print(f"Launching ProcessPool with {num_workers} workers for OCR...")
+    with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = [executor.submit(process_single_disclosure, item) for item in to_process]
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                data_rows = future.result()
+                if data_rows: results_list.extend(data_rows)
+            except Exception as e:
+                print(f"Worker Error: {e}")
+
+    # 4. Sequential Enrichment & Batch DB Save (I/O Bound Metadata)
+    print(f"Parsing Complete. Saving {len(results_list)} records with Market Intelligence...")
+    
+    for t_data in results_list:
+        try:
+            # Enrichment (Serial but fast per ticker)
+            market_meta = get_market_metadata(t_data["ticker"])
+            t_data["rvol"] = market_meta["rvol"]
+            t_data["price_history"] = json.dumps(market_meta["price_history"])
             
-    print(f"Scraper finished at {datetime.now()}")
+            score, reasons = calculate_score(t_data, db=db)
+            t_data["score"] = score
+            t_data["score_reasons"] = json.dumps(reasons)
+            
+            transaction = InsiderTransaction(**t_data)
+            db.add(transaction)
+        except Exception as e:
+            print(f"Enrichment Error for {t_data.get('ticker')}: {e}")
+
+    db.commit()
+    db.close()
+    print(f"Parallel Scraper Finished at {datetime.now()}")
 
 if __name__ == "__main__":
     run_scraper()
