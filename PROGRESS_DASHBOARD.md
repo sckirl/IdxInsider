@@ -5,37 +5,45 @@
 
 ---
 
-## 🏗️ Architecture & Component Status
+## 📊 Component Completion Dashboard
 
-| Component | Progress | Status | Key Features / Notes |
+| Component | Completion | Status | Notes |
 | :--- | :---: | :---: | :--- |
-| **Project Management (PM)** | 100% | 🟢 | Roadmap defined, Goal achieved for April 2026. |
-| **Business Analysis (BA)** | 100% | 🟢 | Data schema, Scoring logic, IDX API discovery complete. |
-| **Backend (DEV)** | 100% | 🟢 | FastAPI on port 8000, CORS fixed, /latest, /scrape working. |
-| **Scraper (DEV)** | 95% | 🟢 | Playwright bypass Cloudflare for list. Fixed 404/403 errors. |
-| **Frontend (DEV)** | 100% | 🟢 | Next.js on port 6969, Connected to backend, Real-time feed. |
-| **Database (DEV)** | 100% | 🟢 | PostgreSQL with real April 2026 data. |
-| **QA / Testing (QA)** | 90% | 🟢 | Rigorous testing of data extraction & API connectivity. |
+| **Overall Project** | **92%** | 🟡 | Core functionality live, awaiting extraction accuracy improvements. |
+| **Backend API (DEV)** | 100% | 🟢 | FastAPI, PostgreSQL, Dockerized. Endpoints working (`/latest`, `/clusters`). |
+| **Frontend UI (DEV)** | 100% | 🟢 | Next.js Dashboard. Real-time feed & Cluster Buys UI fully operational. |
+| **Database & Schema** | 100% | 🟢 | PostgreSQL structured with automated schema definitions. |
+| **Scraping Infrastructure** | 95% | 🟢 | Async Playwright successfully bypasses Cloudflare to fetch PDFs. Multi-threaded. |
+| **QA / Automated Testing** | 95% | 🟢 | Playwright UI & API tests fully passing. Fixed false-positive port issues. |
+| **Data Extraction (OCR/NLP)** | 60% | 🟡 | `pdfplumber` implemented. Brittle on unstructured grids (Price extraction often fails). |
 
 ---
 
-## 📊 Milestone Tracker (ROADMAP.md)
+## 📝 Agent Handover Notes & Today's Progress (April 9, 2026)
 
-- [x] **Milestone 1: Data Ingestion** (Fixed IDX API URL, Playwright bypass)
-- [x] **Milestone 2: Intelligence & Logic** (Smart Scoring applied to real data)
-- [x] **Milestone 3: Web Layer** (Next.js Dashboard fully operational)
-- [x] **Milestone 4: Rigorous QA & Certifications** (Verified with April 2026 transactions)
-- [x] **Milestone 5: Final Delivery** (Docker orchestration complete)
+**What was achieved today:**
+1. **QA & Environment Fixes:** Fixed Playwright test configurations (Frontend mapping: 6969, Backend: 8000), resolving failing test suites. Fixed DB seeding pipeline.
+2. **Data Integrity Enforcement:** Enforced strict rules against hallucinating data (added to `GEMINI.md`). Purged the database of fake future transactions (e.g., 2026-10-05 data).
+3. **Scraper Concurrency & Bugs:** Multi-threaded the PDF ingestion pipeline using `ThreadPoolExecutor`. Fixed `Maximum call stack size exceeded` errors by using `FileReader` instead of JS spread syntax for extracting large PDFs in Playwright.
+4. **Data Sourcing:** Successfully scraped the actual IDX disclosures for 2026.
+5. **UAT "Inspect Transaction" Bug:** Fixed the issue where clicking "Inspect Transaction" for older cluster buys (BBCA, GOOD, TOWR) showed blank data by increasing the `/insider/latest` endpoint memory limit from 100 to 1000 items.
+6. **OCR Refactor (`plumber` branch):** Switched to a pure `pdfplumber` (layout=True) extraction on the `plumber` branch. Verified that it parses shares accurately but completely drops the ball on extracting "Price" due to unstructured IDX table layouts breaking regex bounds.
 
----
-
-## 🚀 Recent Fixes (April 9, 2026)
-
-1.  **Fixed Backend Connectivity:** Resolved port mismatch between Docker container (6969) and Host (8000). Dashboard no longer shows "Failed to fetch".
-2.  **Discovered New IDX API:** Identified `primary/ListedCompany/GetAnnouncement` as the correct 2026 endpoint.
-3.  **Bypassed Cloudflare:** Updated Scraper to use Playwright with correct parameters and session handling.
-4.  **Seeded Real Data:** Populated database with actual April 2026 insider transactions (PADA, BJTM, WGSH, etc.).
+**Known Issues & Limitations:**
+- `pdfplumber` + Regex is extremely fast but highly brittle. It misses the *Price* (inserting 0.0) when the IDX PDF tables use unstructured grids or unpredictable spacing.
 
 ---
 
-*“Siapa insider di Indonesia yang sedang membeli saham secara signifikan?” — Dashboard is LIVE at localhost:6969.*
+## 🎯 Next Immediate Goals for the Next Agent
+
+**1. Implement LLM-Based Vision Extraction (Hybrid Triage Pipeline)**
+- **Goal:** Replace the brittle Regex/pdfplumber parsing with a multimodal LLM API (e.g., Gemini 1.5 Flash or GPT-4o-mini via Structured Outputs).
+- **Why:** Deep research confirmed OCR + Regex fails on non-standard IDX layouts. A Vision-Language Model can accurately extract Shares, Prices, and Insider Names strictly into a JSON schema by "reading" the document visually, avoiding the trap of coordinates and regex.
+- **Action:** Retain `PyMuPDF`/`pdfplumber` ONLY to check if a document is a valid digital PDF. Route all complex tabular extraction to the Multimodal API.
+
+**2. Setup Deterministic Validation Layer**
+- **Goal:** Add a Pydantic validation step after LLM extraction.
+- **Why:** To ensure mathematical logic (Shares * Price = Value) and that dates are strictly valid before inserting into PostgreSQL, eliminating any residual hallucination risk.
+
+**3. Production Deployment**
+- **Goal:** Finalize Docker Compose memory limits, setup a robust cron scheduler for the background scraper task, and prepare for final production server deployment.

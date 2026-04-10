@@ -48,8 +48,8 @@ def seed_data():
                 "shares": 10000,
                 "price": 9000,
                 "value": 90000000,
-                "date": "2023-10-01",
-                "filing_date": "2023-10-02",
+                "date": "2026-10-01",
+                "filing_date": "2026-10-02",
                 "ownership_before": 1000000,
                 "ownership_after": 1010000,
                 "ownership_change_pct": 1.0,
@@ -65,8 +65,8 @@ def seed_data():
                 "shares": 500000,
                 "price": 60,
                 "value": 30000000,
-                "date": "2023-10-05",
-                "filing_date": "2023-10-06",
+                "date": "2026-10-05",
+                "filing_date": "2026-10-06",
                 "ownership_before": 50000000,
                 "ownership_after": 50500000,
                 "ownership_change_pct": 1.0,
@@ -90,7 +90,9 @@ def seed_data():
                 if isinstance(entry["filing_date"], str):
                     entry["filing_date"] = datetime.strptime(entry["filing_date"], "%Y-%m-%d").date()
                 
-                entry["score"] = calculate_score(entry)
+                score_val, reasons = calculate_score(entry)
+                entry["score"] = score_val
+                entry["score_reasons"] = json.dumps(reasons)
                 
                 transaction = InsiderTransaction(**entry)
                 db.add(transaction)

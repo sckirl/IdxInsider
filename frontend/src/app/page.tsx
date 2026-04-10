@@ -141,7 +141,7 @@ export default function Home() {
             disabled={isScraping}
             className={`text-xs bg-blue-600/10 text-blue-400 border border-blue-500/20 px-3 py-1.5 rounded hover:bg-blue-600/20 transition-all ${isScraping ? 'opacity-50' : ''}`}
           >
-            {isScraping ? 'Scraping 2026...' : 'Scrape Full 2026'}
+            {isScraping ? 'Scraping YTD...' : 'Scrape YTD'}
           </button>
         </div>
       </header>

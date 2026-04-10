@@ -82,7 +82,7 @@ def trigger_scrape(background_tasks: BackgroundTasks, full_year: bool = False):
 @app.get("/insider/latest", response_model=List[Dict[str, Any]])
 def get_latest_insiders(db: Session = Depends(get_db)):
     try:
-        transactions = db.query(InsiderTransaction).order_by(InsiderTransaction.filing_date.desc()).limit(100).all()
+        transactions = db.query(InsiderTransaction).order_by(InsiderTransaction.filing_date.desc()).limit(1000).all()
         result = []
         for t in transactions:
             t_dict = {c.name: getattr(t, c.name) for c in t.__table__.columns}

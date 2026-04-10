@@ -304,3 +304,16 @@ This is:
 A financial intelligence system for detecting insider behavior in an inefficient market.
 
 Accuracy, clarity, and usability are critical.
+
+⸻
+
+🚫 NEGATIVES (DO NOT REPEAT)
+
+1.  **Cosmetic Placeholders:** Never implement UI elements (like Search) as static visuals. If a feature is in the UI, the logic MUST be connected and verified.
+2.  **Premature Finalization:** Never report a task as "Live" or "Certified" if the database is empty or the background task is still running unverified.
+3.  **Brittle Infrastructure:** Do not hardcode hostnames like `localhost` or `db`. Always use environment variables and verify container-to-container connectivity before submission.
+4.  **Implicit Merging:** Never merge feature branches into `master` without a direct and specific user instruction to do so.
+5.  **Data Blindness:** If a scraper finds 100+ items but ingests 0, do not ignore the logs. This is a critical failure of the parsing logic that must be addressed before proceeding.
+6.  **Indentation/Syntax Loops:** Double-check Python indentation and JavaScript syntax before committing to avoid multiple turns wasted on trivial fix-ups.
+7.  **Data Integrity:** DO NOT MAKE UP DATA OR ADD UNFACTUAL TRANSACTION INTO THE DATABASE. Do not add data from the future or fake reports (e.g. 2026-10-5 data for GOTO and BBCA when it's not even April yet).
+8.  **QA Validation:** DO NOT SEND THE PRODUCTION PRODUCT AND SAY YOU HAVE FINISHED IF: SENIOR QA ENGINEER CAUGHT YOU HAVING UN FACTUAL DATA, TOO UNREALISTIC (TOO LITTLE OR TOO MUCH DATA), OR BUGGY MESS WITH LOTS OF DEFECT. YOU MUST FIX EVERYTHING BEFORE GIVING ME ANY UPDATES.
