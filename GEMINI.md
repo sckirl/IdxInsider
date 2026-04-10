@@ -317,3 +317,4 @@ Accuracy, clarity, and usability are critical.
 6.  **Indentation/Syntax Loops:** Double-check Python indentation and JavaScript syntax before committing to avoid multiple turns wasted on trivial fix-ups.
 7.  **Data Integrity:** DO NOT MAKE UP DATA OR ADD UNFACTUAL TRANSACTION INTO THE DATABASE. Do not add data from the future or fake reports (e.g. 2026-10-5 data for GOTO and BBCA when it's not even April yet).
 8.  **QA Validation:** DO NOT SEND THE PRODUCTION PRODUCT AND SAY YOU HAVE FINISHED IF: SENIOR QA ENGINEER CAUGHT YOU HAVING UN FACTUAL DATA, TOO UNREALISTIC (TOO LITTLE OR TOO MUCH DATA), OR BUGGY MESS WITH LOTS OF DEFECT. YOU MUST FIX EVERYTHING BEFORE GIVING ME ANY UPDATES.
+9.  **Premature Submission:** DO NOT SUBMIT AND NOTIFY ME IF THE APP IS NOT FINISHED OR STILL HAVE DEFECTS. FAILURE TO ADHERE TO THIS WILL RESULT IN IMMEDIATE TEAM REPLACEMENT.

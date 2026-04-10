@@ -181,10 +181,33 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
                 potential_prices = [n for n in all_nums if 50 <= n <= 500000 and n != shares]
                 if potential_prices: price = potential_prices[-1]
 
-        # Fallback to Stock API if price is 0
-        if price == 0 and shares > 0:
-            print(f"DEBUG: Price for {ticker} is 0 for {final_date}, fetching from API...")
-            price = get_price_on_date(ticker, final_date)
+        # Fallback to Stock API if price is 0 or looks unrealistic
+        api_price = get_price_on_date(ticker, final_date)
+        
+        # Sanity Check Logic:
+        # 1. If doc price is 0, use API.
+        # 2. If doc price is 'off by a lot' (>20% difference from API), use API.
+        # 3. If total value is suspiciously low (< 1,000,000 IDR), use API to re-calculate.
+        
+        use_api_price = False
+        if price == 0:
+            use_api_price = True
+            print(f"DEBUG: Price for {ticker} is 0, using API price {api_price}")
+        elif api_price > 0:
+            diff_pct = abs(price - api_price) / api_price
+            if diff_pct > 0.20: # 20% threshold for 'off by a lot'
+                print(f"DEBUG: Price for {ticker} ({price}) deviates >20% from API ({api_price}). Overriding with API.")
+                use_api_price = True
+        
+        if use_api_price and api_price > 0:
+            price = api_price
+            total_value = shares * price
+        
+        # Final safety check for total value
+        if total_value > 0 and total_value < 1000000 and api_price > 0:
+            print(f"DEBUG: Value for {ticker} (IDR {total_value}) is suspiciously low. Recalculating with API price {api_price}")
+            price = api_price
+            total_value = shares * price
 
         if total_value == 0:
             total_value = shares * price
