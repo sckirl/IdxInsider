@@ -98,12 +98,13 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
         ticker = "UNKNOWN"
         m_ticker = re.search(r"(?:Nama Perusahaan Tbk|Issuer|Kode Emiten|Kode Saham)\s*[:]?\s*([A-Z]{4})", full_text, re.I)
         if m_ticker: 
-            ticker = m_ticker.group(1).strip()
+            ticker = m_ticker.group(1).upper().strip()
         else:
             m5 = re.search(r"\(([A-Z]{4})\)", full_text)
-            if m5: ticker = m5.group(1).strip()
+            if m5: ticker = m5.group(1).upper().strip()
 
-        if ticker == "UNKNOWN" or len(ticker) != 4: return []
+        if ticker == "UNKNOWN" or len(ticker) != 4:
+            return []
 
         # Transaction Date
         t_date = extract_transaction_date(full_text)
@@ -189,31 +190,32 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
         # 2. If doc price is 'off by a lot' (>20% difference from API), use API.
         # 3. If total value is suspiciously low (< 1,000,000 IDR), use API to re-calculate.
         
+        # Billionaire Sanity Check & Value Cap
+        # No single insider buy in IDX history is likely to exceed 100 Trillion IDR.
+        VALUE_CAP = 100_000_000_000_000 # 100 Trillion IDR
+
         use_api_price = False
         if price == 0:
             use_api_price = True
-            print(f"DEBUG: Price for {ticker} is 0, using API price {api_price}")
         elif api_price > 0:
             diff_pct = abs(price - api_price) / api_price
-            if diff_pct > 0.20: # 20% threshold for 'off by a lot'
-                print(f"DEBUG: Price for {ticker} ({price}) deviates >20% from API ({api_price}). Overriding with API.")
+            if diff_pct > 0.20: # 20% threshold
                 use_api_price = True
         
         if use_api_price and api_price > 0:
             price = api_price
             total_value = shares * price
         
-        # Final safety check for total value
-        if total_value > 0 and total_value < 1000000 and api_price > 0:
-            print(f"DEBUG: Value for {ticker} (IDR {total_value}) is suspiciously low. Recalculating with API price {api_price}")
-            price = api_price
-            total_value = shares * price
-
         if total_value == 0:
             total_value = shares * price
 
+        # Final Rejection Cap
+        if total_value > VALUE_CAP:
+            print(f"CRITICAL: Value for {ticker} (IDR {total_value}) exceeds sanity cap. Rejecting as artifact.")
+            return []
+
         # Record company format if we found something new or it's different
-        if shares > 0:
+        if shares > 0 and total_value < VALUE_CAP:
              current_fmt = {
                  "last_updated": datetime.now().strftime("%Y-%m-%d"),
                  "shares": shares,

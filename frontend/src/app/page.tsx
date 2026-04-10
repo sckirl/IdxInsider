@@ -199,6 +199,7 @@ export default function Home() {
                   <th className="p-3 font-semibold text-[#8B949E] text-right">Value (IDR)</th>
                   <th className="p-3 font-semibold text-[#8B949E] text-center">RVOL</th>
                   <th className="p-3 font-semibold text-[#8B949E] text-center">Score</th>
+                  <th className="p-3 font-semibold text-[#8B949E] text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#30363D]">
@@ -253,6 +254,16 @@ export default function Home() {
                           </div>
                         </div>
                       </td>
+                      <td className="p-3 text-center">
+                        <a 
+                          href={`https://stockbit.com/symbol/${row.ticker}/insider`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded text-[10px] font-bold transition-all active:scale-95"
+                        >
+                          Trade
+                        </a>
+                      </td>
                     </tr>
                   );
                 })}
@@ -300,7 +311,7 @@ export default function Home() {
                      INSPECT TRANSACTIONS
                    </button>
                    <a 
-                    href={`https://stockbit.com/symbol/${cluster.ticker}`}
+                    href={`https://stockbit.com/symbol/${cluster.ticker}/insider`}
                     target="_blank"
                     className="bg-[#21262D] text-[#C9D1D9] text-[10px] font-bold px-3 py-2 rounded hover:bg-[#30363D]"
                    >

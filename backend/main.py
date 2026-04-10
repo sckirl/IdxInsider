@@ -42,16 +42,10 @@ async def run_scraper_async(full_year=False):
         print(f"Background Task Error: {e}")
 
 async def daily_scheduler():
-    # UAT TEST: Run in 1 minute
-    print("UAT: Scheduler will run in 60 seconds for verification...")
-    await asyncio.sleep(60)
-    await run_scraper_async()
-    
-    # After UAT, switch to random 1AM-5AM schedule
     import random
     while True:
         now_wib = datetime.now(timezone(timedelta(hours=7)))
-        # Random hour between 1 and 4, random minute between 0 and 59
+        # Random hour between 1 and 4 (inclusive), random minute between 0 and 59
         random_hour = random.randint(1, 4)
         random_minute = random.randint(0, 59)
         
