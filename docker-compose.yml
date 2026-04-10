@@ -22,6 +22,7 @@ services:
       - ./backend:/backend
     environment:
       # DATABASE_URL removed to use direct IP from database.py
+      PYTHONUNBUFFERED: 1
       ALLOWED_ORIGINS: "http://${SERVER_IP:-localhost}:${FRONTEND_PORT:-6969},http://localhost:6969"
     depends_on:
       - db

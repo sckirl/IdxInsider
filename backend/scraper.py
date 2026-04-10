@@ -49,9 +49,15 @@ def extract_transaction_date(text: str) -> Optional[datetime.date]:
     """
     Extracts transaction date using common Indonesian and English patterns.
     """
+    # Clean text for better matching
+    text = text.replace("\n", " ")
+    
     date_patterns = [
-        r"(?:Tanggal Transaksi|Date of Transaction)\s*[:]?\s*(\d{1,2}[\/\-\.\s](?:Jan(?:uari)?|Feb(?:ruari)?|Mar(?:et)?|Apr(?:il)?|Mei|Jun(?:i)?|Jul(?:i)?|Agu(?:stus)?|Sep(?:tember)?|Okt(?:ober)?|Nov(?:ember)?|Des(?:ember)?)\s*\d{4})",
-        r"(?:Tanggal Transaksi|Date of Transaction)\s*[:]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})",
+        # Indonesian: Tanggal Transaksi: Senin, 06 April 2026
+        r"(?:Tanggal Transaksi|Date of Transaction)\s*[:]?\s*(?:[A-Za-z]+,?\s*)?(\d{1,2}[\/\-\.\s](?:Jan(?:uari)?|Feb(?:ruari)?|Mar(?:et)?|Apr(?:il)?|Mei|Jun(?:i)?|Jul(?:i)?|Agu(?:stus)?|Sep(?:tember)?|Okt(?:ober)?|Nov(?:ember)?|Des(?:ember)?)\s*\d{4})",
+        # Slash format: 06/04/2026
+        r"(?:Tanggal Transaksi|Date of Transaction)\s*[:]?\s*(?:[A-Za-z]+,?\s*)?(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})",
+        # English: April 10, 2026
         r"(\d{1,2}[\/\-\.\s](?:January|February|March|April|May|June|July|August|September|October|November|December)\s*\d{4})",
         r"([A-Z]{3,10}\s+\d{1,2},\s+\d{4})"
     ]
@@ -121,8 +127,16 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
         # Shares & Price (NLP/Pattern matching)
         shares = 0
         price = 0
+        total_value = 0
         
-        # Pattern 1: Jumlah Saham Sebelum/Sesudah
+        # Pattern 1: Nilai Transaksi Total (Common in KSEI reports)
+        m_total = re.search(r"(?:Total Nilai Transaksi|Transaction Value)\s*[:]?\s*Rp?\s*([\d\.,]+)", full_text, re.I)
+        if m_total:
+            try:
+                total_value = float(m_total.group(1).replace(".", "").replace(",", "."))
+            except: pass
+
+        # Pattern 2: Jumlah Saham Sebelum/Sesudah
         before_match = re.search(r"Jumlah Saham Sebelum Transaksi[^\d]*([\d\.,]+)", full_text, re.I)
         after_match = re.search(r"Jumlah Saham Setelah Transaksi[^\d]*([\d\.,]+)", full_text, re.I)
         if before_match and after_match:
@@ -133,7 +147,7 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
             except: pass
 
         if price == 0 and shares > 0:
-            # Pattern 2: Price after shares
+            # Pattern 3: Price after shares
             shares_str1 = f"{shares:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             shares_str2 = f"{int(shares):,}".replace(",", ".")
             p_pattern = f"(?:{re.escape(shares_str1)}|{re.escape(shares_str2)})\\s+([\\d\\.,]+)"
@@ -144,26 +158,36 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
                 except: pass
 
         if price == 0 and shares > 0:
-            # Pattern 3: "Harga" followed by price
+            # Pattern 4: "Harga" followed by price
             m_price2 = re.search(r"Harga\s*[:]?\s*Rp?\s*([\d\.,]+)", full_text, re.I)
             if m_price2:
                 try:
                     price = float(m_price2.group(1).replace(".", "").replace(",", "."))
                 except: pass
 
+        if price == 0 and shares > 0 and total_value > 0:
+            price = total_value / shares
+
         if shares == 0:
-            # Pattern 4: Broad search for large numbers
+            # Pattern 5: Broad search for large numbers
             clean_text = full_text.replace("Rp", "").replace(".", "").replace(",", ".")
-            numbers = [float(n) for n in re.findall(r"\b\d+\.\d+\b|\b\d+\b", clean_text)]
-            if numbers:
-                shares = max(numbers)
-                potential_prices = [n for n in numbers if 1 <= n <= 500000 and n != shares]
+            # Extract all numbers and sort by size
+            all_nums = [float(n) for n in re.findall(r"\b\d+\.\d+\b|\b\d+\b", clean_text)]
+            all_nums = [n for n in all_nums if n > 1] # Remove small values
+            if all_nums:
+                # Usually shares is the largest number, price is mid-size
+                shares = max(all_nums)
+                # Filter for common stock prices (1 - 500,000)
+                potential_prices = [n for n in all_nums if 50 <= n <= 500000 and n != shares]
                 if potential_prices: price = potential_prices[-1]
 
         # Fallback to Stock API if price is 0
         if price == 0 and shares > 0:
-            print(f"Price for {ticker} is 0 or not found, fetching from API for {final_date}...")
+            print(f"DEBUG: Price for {ticker} is 0 for {final_date}, fetching from API...")
             price = get_price_on_date(ticker, final_date)
+
+        if total_value == 0:
+            total_value = shares * price
 
         # Record company format if we found something new or it's different
         if shares > 0:
@@ -171,13 +195,14 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
                  "last_updated": datetime.now().strftime("%Y-%m-%d"),
                  "shares": shares,
                  "price": price,
-                 "date_found": t_date is not None
+                 "date_found": t_date is not None,
+                 "total_value_found": total_value > 0
              }
-             if ticker not in company_formats or company_formats[ticker].get("shares") != shares:
+             if ticker not in company_formats:
                 company_formats[ticker] = current_fmt
                 save_company_formats(company_formats)
 
-        t_type = "SELL" if any(x in full_text.lower() for x in ["jual", "sales", "pengurangan"]) else "BUY"
+        t_type = "SELL" if any(x in full_text.lower() for x in ["jual", "sales", "pengurangan", "pelepasan"]) else "BUY"
 
         transactions.append({
             "ticker": ticker,
@@ -187,7 +212,7 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
             "transaction_type": t_type,
             "shares": float(shares),
             "price": float(price),
-            "value": float(shares * price),
+            "value": float(total_value),
             "date": final_date,
             "filing_date": filing_date,
             "source_url": source_url
