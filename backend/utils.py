@@ -51,6 +51,38 @@ def get_market_metadata(ticker: str) -> Dict[str, Any]:
         print(f"Error fetching market data for {ticker}: {e}")
         return {"rvol": 1.0, "price_history": []}
 
+def get_price_on_date(ticker: str, date: datetime.date) -> float:
+    """
+    Fetch the historical closing price of a stock on a specific date using yfinance.
+    """
+    import yfinance as yf
+    try:
+        symbol = f"{ticker.upper()}.JK"
+        stock = yf.Ticker(symbol)
+        
+        # Fetch history for a small range around the target date to ensure we get a match
+        start_date = date - datetime.timedelta(days=5)
+        end_date = date + datetime.timedelta(days=5)
+        hist = stock.history(start=start_date.strftime("%Y-%m-%d"), end=end_date.strftime("%Y-%m-%d"))
+        
+        if hist.empty:
+            return 0.0
+            
+        # Try to find the exact date, or the closest previous trading day
+        target_str = date.strftime("%Y-%m-%d")
+        if target_str in hist.index.strftime("%Y-%m-%d"):
+            return float(hist.loc[hist.index.strftime("%Y-%m-%d") == target_str]['Close'].iloc[0])
+        
+        # Get the latest price before or on the target date
+        valid_hist = hist[hist.index.date <= date]
+        if not valid_hist.empty:
+            return float(valid_hist['Close'].iloc[-1])
+            
+        return float(hist['Close'].iloc[0])
+    except Exception as e:
+        print(f"Error fetching price for {ticker} on {date}: {e}")
+        return 0.0
+
 def calculate_score(transaction: Dict[str, Any], db=None) -> Tuple[int, List[str]]:
     """
     Implements the Smart Scoring System with reason breakdown.

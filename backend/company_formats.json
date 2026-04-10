@@ -1,0 +1,26 @@
+{
+    "EPAC": {
+        "last_updated": "2026-04-10",
+        "shares": 52060000.0,
+        "price": 60.0,
+        "date_found": true
+    },
+    "AKPI": {
+        "last_updated": "2026-04-10",
+        "shares": 1100.0,
+        "price": 500.0,
+        "date_found": true
+    },
+    "CASH": {
+        "last_updated": "2026-04-10",
+        "shares": 1172700.0,
+        "price": 171.0,
+        "date_found": true
+    },
+    "BULL": {
+        "last_updated": "2026-04-10",
+        "shares": 13700000.0,
+        "price": 428.0,
+        "date_found": true
+    }
+}
