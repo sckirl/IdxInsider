@@ -14,7 +14,7 @@ import pdfplumber
 
 from .database import SessionLocal, engine
 from .models import InsiderTransaction, Base
-from .utils import normalize_role, calculate_score, get_market_metadata, get_price_on_date
+from .utils import normalize_role, calculate_score, get_market_metadata, get_price_on_date, calculate_ownership_change
 
 # Ensure DB tables are created
 Base.metadata.create_all(bind=engine)
@@ -25,6 +25,7 @@ KEYWORDS = [
     "Laporan Kepemilikan",
     "Informasi Hasil Pelaksanaan Pembelian Kembali Saham"
 ]
+RESERVED_KEYWORDS = ["KETR", "LAPP", "LAMP", "BERI", "DATA", "INFO", "LAMP"] # Common misparsed tickers
 
 # Cache for company-specific formatting
 COMPANY_FORMATS_FILE = "backend/company_formats.json"
@@ -103,7 +104,7 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
             m5 = re.search(r"\(([A-Z]{4})\)", full_text)
             if m5: ticker = m5.group(1).upper().strip()
 
-        if ticker == "UNKNOWN" or len(ticker) != 4:
+        if ticker == "UNKNOWN" or len(ticker) != 4 or ticker in RESERVED_KEYWORDS:
             return []
 
         # Transaction Date
@@ -129,29 +130,54 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
         shares = 0
         price = 0
         total_value = 0
+        ownership_before = 0
+        ownership_after = 0
         
         # Pattern 1: Nilai Transaksi Total (Common in KSEI reports)
-        m_total = re.search(r"(?:Total Nilai Transaksi|Transaction Value)\s*[:]?\s*Rp?\s*([\d\.,]+)", full_text, re.I)
+        m_total = re.search(r"(?:Total Nilai Transaksi|Transaction Value|Nilai Transaksi)\s*[:]?\s*Rp?\s*([\d\.,]+)", full_text, re.I)
         if m_total:
             try:
                 total_value = float(m_total.group(1).replace(".", "").replace(",", "."))
             except: pass
 
-        # Pattern 2: Jumlah Saham Sebelum/Sesudah
-        before_match = re.search(r"Jumlah Saham Sebelum Transaksi[^\d]*([\d\.,]+)", full_text, re.I)
-        after_match = re.search(r"Jumlah Saham Setelah Transaksi[^\d]*([\d\.,]+)", full_text, re.I)
-        if before_match and after_match:
+        # Pattern 2: Jumlah Saham Sebelum/Sesudah & Calculate Shares
+        before_match = re.search(r"(?:Jumlah Saham Sebelum Transaksi|Number of shares held before|Status Kepemilikan Sebelum)\s*[:]?\s*([\d\.,]+)", full_text, re.I)
+        after_match = re.search(r"(?:Jumlah Saham Setelah Transaksi|Number of shares held after|Status Kepemilikan Setelah)\s*[:]?\s*([\d\.,]+)", full_text, re.I)
+        
+        if before_match:
             try:
-                b_str = before_match.group(1).replace(".", "").replace(",", ".")
-                a_str = after_match.group(1).replace(".", "").replace(",", ".")
-                shares = abs(float(b_str) - float(a_str))
+                ownership_before = float(before_match.group(1).replace(".", "").replace(",", "."))
             except: pass
+            
+        if after_match:
+            try:
+                ownership_after = float(after_match.group(1).replace(".", "").replace(",", "."))
+            except: pass
+            
+        if ownership_before > 0 and ownership_after > 0:
+            shares = abs(ownership_after - ownership_before)
+        
+        if shares == 0:
+            # Try specific "Jumlah Saham yang dibeli/dijual" patterns
+            m_trans_shares = re.search(r"(?:Jumlah Saham yang (?:dibeli|dijual)|Number of shares (?:bought|sold)|Jumlah yang (?:dibeli|dijual))\s*[:]?\s*([\d\.,]+)", full_text, re.I)
+            if m_trans_shares:
+                try:
+                    shares = float(m_trans_shares.group(1).replace(".", "").replace(",", "."))
+                except: pass
+
+        if shares == 0:
+            # Fallback if specific "Before/After" labels are missing but "Jumlah Saham" exists
+            m_shares = re.search(r"(?:Jumlah Saham|Number of Shares|Shares)\s*[:]?\s*([\d\.,]+)", full_text, re.I)
+            if m_shares:
+                try:
+                    shares = float(m_shares.group(1).replace(".", "").replace(",", "."))
+                except: pass
 
         if price == 0 and shares > 0:
             # Pattern 3: Price after shares
-            shares_str1 = f"{shares:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            shares_str2 = f"{int(shares):,}".replace(",", ".")
-            p_pattern = f"(?:{re.escape(shares_str1)}|{re.escape(shares_str2)})\\s+([\\d\\.,]+)"
+            # Look for a number near the shares amount
+            shares_str_clean = str(int(shares))
+            p_pattern = f"{re.escape(shares_str_clean)}[^\\d]+([\\d\\.,]+)"
             m_price = re.search(p_pattern, full_text)
             if m_price:
                 try:
@@ -160,7 +186,7 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
 
         if price == 0 and shares > 0:
             # Pattern 4: "Harga" followed by price
-            m_price2 = re.search(r"Harga\s*[:]?\s*Rp?\s*([\d\.,]+)", full_text, re.I)
+            m_price2 = re.search(r"(?:Harga|Price|Harga Transaksi|Price of Transaction)\s*[:]?\s*(?:Rp)?\s*([\d\.,]+)", full_text, re.I)
             if m_price2:
                 try:
                     price = float(m_price2.group(1).replace(".", "").replace(",", "."))
@@ -169,52 +195,62 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
         if price == 0 and shares > 0 and total_value > 0:
             price = total_value / shares
 
-        if shares == 0:
-            # Pattern 5: Broad search for large numbers
-            clean_text = full_text.replace("Rp", "").replace(".", "").replace(",", ".")
-            # Extract all numbers and sort by size
-            all_nums = [float(n) for n in re.findall(r"\b\d+\.\d+\b|\b\d+\b", clean_text)]
-            all_nums = [n for n in all_nums if n > 1] # Remove small values
-            if all_nums:
-                # Usually shares is the largest number, price is mid-size
-                shares = max(all_nums)
-                # Filter for common stock prices (1 - 500,000)
-                potential_prices = [n for n in all_nums if 50 <= n <= 500000 and n != shares]
-                if potential_prices: price = potential_prices[-1]
+        if shares == 0 and total_value > 0 and price > 0:
+            shares = total_value / price
 
-        # Fallback to Stock API if price is 0 or looks unrealistic
+        if shares == 0:
+            # Broad search for the largest number that isn't the total value (if found)
+            clean_text = full_text.replace("Rp", "").replace(".", "").replace(",", ".")
+            all_nums = [float(n) for n in re.findall(r"\b\d+\.\d+\b|\b\d+\b", clean_text)]
+            all_nums = [n for n in all_nums if n > 1]
+            if all_nums:
+                # If we have total_value, shares might be total_value / price_near_it
+                # Otherwise, assume largest is shares
+                potential_shares = max(all_nums)
+                if total_value > 0 and potential_shares == total_value:
+                    # Look for second largest
+                    remaining = [n for n in all_nums if n != total_value]
+                    if remaining: potential_shares = max(remaining)
+                shares = potential_shares
+
+        # Fallback to Stock API if price is 0
         api_price = get_price_on_date(ticker, final_date)
         
-        # Sanity Check Logic:
-        # 1. If doc price is 0, use API.
-        # 2. If doc price is 'off by a lot' (>20% difference from API), use API.
-        # 3. If total value is suspiciously low (< 1,000,000 IDR), use API to re-calculate.
-        
-        # Billionaire Sanity Check & Value Cap
-        # No single insider buy in IDX history is likely to exceed 100 Trillion IDR.
-        VALUE_CAP = 100_000_000_000_000 # 100 Trillion IDR
-
-        use_api_price = False
-        if price == 0:
-            use_api_price = True
-        elif api_price > 0:
-            diff_pct = abs(price - api_price) / api_price
-            if diff_pct > 0.20: # 20% threshold
-                use_api_price = True
-        
-        if use_api_price and api_price > 0:
+        if price == 0 or price < 1:
             price = api_price
-            total_value = shares * price
+            
+        if shares == 0:
+            if total_value > 0 and price > 0:
+                shares = total_value / price
+            else:
+                # If we STILL have no shares, look for any large number that isn't the price
+                clean_text = full_text.replace("Rp", "").replace(".", "").replace(",", ".")
+                all_nums = [float(n) for n in re.findall(r"\b\d+\.\d+\b|\b\d+\b", clean_text)]
+                all_nums = [n for n in all_nums if n > 1 and n != price]
+                if all_nums:
+                    shares = max(all_nums)
+                else:
+                    shares = 1.0 # Last resort fallback
         
         if total_value == 0:
             total_value = shares * price
 
-        # Final Rejection Cap
+        # If total_value is suspiciously low compared to API, re-calculate
+        if api_price > 0 and total_value < (shares * api_price * 0.5):
+             price = api_price
+             total_value = shares * price
+
+        # Final sanity check: if value is still 0, reject this item
+        if total_value == 0:
+            return []
+
+        # Billionaire Sanity Check & Value Cap
+        VALUE_CAP = 100_000_000_000_000 # 100 Trillion IDR
         if total_value > VALUE_CAP:
             print(f"CRITICAL: Value for {ticker} (IDR {total_value}) exceeds sanity cap. Rejecting as artifact.")
             return []
 
-        # Record company format if we found something new or it's different
+        # Record company format
         if shares > 0 and total_value < VALUE_CAP:
              current_fmt = {
                  "last_updated": datetime.now().strftime("%Y-%m-%d"),
@@ -240,6 +276,9 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
             "value": float(total_value),
             "date": final_date,
             "filing_date": filing_date,
+            "ownership_before": float(ownership_before),
+            "ownership_after": float(ownership_after),
+            "ownership_change_pct": float(change_pct),
             "source_url": source_url
         })
     except Exception as e:

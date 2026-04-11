@@ -54,33 +54,48 @@ def get_market_metadata(ticker: str) -> Dict[str, Any]:
 def get_price_on_date(ticker: str, date: datetime.date) -> float:
     """
     Fetch the historical closing price of a stock on a specific date using yfinance.
+    Enhanced with better fallbacks for weekend/holiday dates.
     """
     import yfinance as yf
     try:
+        if not ticker or ticker == "UNKNOWN":
+            return 0.0
+            
         symbol = f"{ticker.upper()}.JK"
         stock = yf.Ticker(symbol)
         
         # Fetch history for a small range around the target date to ensure we get a match
-        start_date = date - datetime.timedelta(days=5)
-        end_date = date + datetime.timedelta(days=5)
+        # Increased range to 7 days to cover long holidays
+        start_date = date - datetime.timedelta(days=7)
+        end_date = date + datetime.timedelta(days=2)
         hist = stock.history(start=start_date.strftime("%Y-%m-%d"), end=end_date.strftime("%Y-%m-%d"))
         
         if hist.empty:
-            return 0.0
+            # Try fetching a larger range if empty
+            hist = stock.history(period="1mo")
+            if hist.empty: return 0.0
             
-        # Try to find the exact date, or the closest previous trading day
-        target_str = date.strftime("%Y-%m-%d")
-        if target_str in hist.index.strftime("%Y-%m-%d"):
-            return float(hist.loc[hist.index.strftime("%Y-%m-%d") == target_str]['Close'].iloc[0])
-        
         # Get the latest price before or on the target date
         valid_hist = hist[hist.index.date <= date]
         if not valid_hist.empty:
             return float(valid_hist['Close'].iloc[-1])
-            
+        
+        # If no price before, take the first available price (after)
         return float(hist['Close'].iloc[0])
     except Exception as e:
         print(f"Error fetching price for {ticker} on {date}: {e}")
+        return 0.0
+
+def calculate_ownership_change(before: float, after: float) -> float:
+    """
+    Calculates the percentage change in ownership.
+    """
+    if not before or before == 0:
+        return 0.0
+    try:
+        change = ((after - before) / before) * 100
+        return float(round(change, 4))
+    except:
         return 0.0
 
 def calculate_score(transaction: Dict[str, Any], db=None) -> Tuple[int, List[str]]:
@@ -91,7 +106,7 @@ def calculate_score(transaction: Dict[str, Any], db=None) -> Tuple[int, List[str
     reasons = []
     t_type = str(transaction.get("transaction_type", "BUY")).upper()
     role = normalize_role(transaction.get("role", ""))
-    value = float(transaction.get("value", 0))
+    value = float(transaction.get("value") or 0)
     ticker = transaction.get("ticker", "")
     t_date = transaction.get("date")
 
@@ -136,7 +151,8 @@ def calculate_score(transaction: Dict[str, Any], db=None) -> Tuple[int, List[str
             score += 1
             reasons.append("Direct Ownership (+1)")
             
-        if transaction.get("ownership_change_pct", 0) > 0.1:
+        ownership_pct = transaction.get("ownership_change_pct") or 0
+        if ownership_pct > 0.1:
             score += 2
             reasons.append("Significant Stake Increase (+2)")
         
@@ -146,7 +162,7 @@ def calculate_score(transaction: Dict[str, Any], db=None) -> Tuple[int, List[str
             reasons.append("Double-Conviction: Coincides with Buyback (+3)")
             
         # RVOL Modifiers
-        rvol = transaction.get("rvol", 1.0)
+        rvol = transaction.get("rvol") or 1.0
         if rvol >= 2.0:
             score += 2
             reasons.append(f"High RVOL {rvol}x (+2)")

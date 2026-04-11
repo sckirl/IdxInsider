@@ -6,10 +6,13 @@ graph TD
     classDef dev fill:#2e7d32,stroke:#1b5e20,color:#fff;
     classDef qa fill:#c62828,stroke:#b71c1c,color:#fff;
     classDef infrastructure fill:#37474f,stroke:#263238,color:#fff,stroke-dasharray: 5 5;
+    classDef external fill:#4527a0,stroke:#311b92,color:#fff;
 
-    subgraph User_Interface [External Interaction]
+    subgraph User_Interface [External Interaction & Network]
         User((User/Owner))
-        ProdURL[pukat-master:6969]
+        Tailscale[Tailscale IP / Remote Access]:::infrastructure
+        ProdURL[Next.js UI :6969]
+        Stockbit[Stockbit Insider Verification]:::external
     end
 
     subgraph Control_Plane [Command & Control]
@@ -19,11 +22,19 @@ graph TD
 
     subgraph Intelligence_Layer [Data & Logic Design]
         BA[Business Analyst Agent]:::ba
+        Scoring[Smart Scoring & Cluster Logic]
     end
 
-    subgraph Execution_Core [Engineering & Deployment]
+    subgraph Execution_Core [Engineering & Automation]
         DEV[Developer Agent]:::dev
-        IDX_API[(IDX 2026 API)]
+        API[FastAPI Backend :8000]
+        Scraper[Multi-threaded Scraper]
+        Scheduler[Randomized Scheduler 1AM-5AM]:::infrastructure
+    end
+
+    subgraph Data_Layer [Source & Storage]
+        IDX_API[(IDX 2026 API / PDF)]
+        DB[(PostgreSQL)]
     end
 
     subgraph Validation_Layer [Quality & Resilience]
@@ -31,36 +42,36 @@ graph TD
     end
 
     %% Workflow Flow
-    User -->|Objectives| Supervisor
-    Supervisor -->|Directives| PM
-    PM -->|Features & Milestones| BA
-    BA -->|Data Schema & Scoring Logic| DEV
-    DEV -->|Builds API/UI/Scrapers| QA
-    QA -->|Chaos/UAT Reports| Supervisor
-
-    %% Intervention Loops (The 'Senior Architect' Dynamic)
-    Supervisor -.->|Fire/Hire/Audit| DEV
-    Supervisor -.->|Infrastructure Fixes| Docker[Docker Compose / .env]:::infrastructure
-    Supervisor -.->|Audit Wrongdoings| Codebase[(Codebase Integrity)]
-
-    %% Working Dynamic Details
-    DEV <-->|Real-time Ingestion| IDX_API
-    DEV -->|Hot Reload| ProdURL
-    QA -->|Stress Tests| ProdURL
+    User -->|Access via| Tailscale
+    Tailscale -->|Browser Execution| ProdURL
+    ProdURL -->|Verify Transactions| Stockbit
     
-    %% Specific Agent Duties
-    subgraph Agent_Duties [Internal Working Dynamic]
+    User -->|Directives| Supervisor
+    Supervisor -->|Plan Mode| PM
+    PM -->|Features| BA
+    BA -->|Data Logic| Scoring
+    Scoring -->|Schema| DEV
+    DEV -->|Implement| API
+    DEV -->|Optimize| Scraper
+    Scraper -->|Ingest| IDX_API
+    Scraper -->|Store| DB
+    API <-->|Serve| DB
+    
+    Scheduler -->|Trigger| Scraper
+    
+    %% QA Loop
+    QA -->|Connectivity Tests| Tailscale
+    QA -->|Data Accuracy| DB
+    QA -->|UAT Reports| Supervisor
+
+    %% Connectivity
+    ProdURL <-->|NEXT_PUBLIC_API_URL| API
+
+    %% Agent Duties
+    subgraph Agent_Specialization [Finalized Duties]
         direction LR
         PM_D[Roadmap / UX / Approval]:::pm
-        BA_D[OCR Research / Cluster Logic]:::ba
-        DEV_D[FastAPI / Next.js / Playwright]:::dev
-        QA_D[Chaos / Mobile / Connectivity]:::qa
+        BA_D[Ticker Expansion / NLP]:::ba
+        DEV_D[Docker / Playwright / FastAPI]:::dev
+        QA_D[Regression / UAT / Network]:::qa
     end
-
-    %% Legend
-    legend[Orchestration Flow]
-    Supervisor --- legend
-    legend --- PM
-    legend --- BA
-    legend --- DEV
-    legend --- QA
