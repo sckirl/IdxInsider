@@ -6,7 +6,7 @@ A real-time Indonesian insider trading intelligence platform that identifies hig
 ![Data Recency](https://img.shields.io/badge/Data-April%202026-green)
 ![Intelligence](https://img.shields.io/badge/Asymmetric--Edge-Enabled-orange)
 
-## 💎 Institutional Killer Features
+## Main Features
 
 ### 1. Insider Accumulation Price Map
 A Bloomberg-tier horizontal volume profile that plots exact price-volume clusters of insider transactions. Instantly identify the "Fundamental Floor" where the smartest money in Indonesia is accumulating shares relative to the current market price.
@@ -134,6 +134,3 @@ graph TD
     %% Connectivity
     ProdURL <-->|NEXT_PUBLIC_API_URL| API
 ```
-
----
-*“Siapa insider di Indonesia yang sedang membeli saham secara signifikan?” — Dashboard is LIVE and cross-checked.*
