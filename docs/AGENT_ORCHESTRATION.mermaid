@@ -8,70 +8,83 @@ graph TD
     classDef infrastructure fill:#37474f,stroke:#263238,color:#fff,stroke-dasharray: 5 5;
     classDef external fill:#4527a0,stroke:#311b92,color:#fff;
 
-    subgraph User_Interface [External Interaction & Network]
+    subgraph User_Interface [Institutional Intelligence Layer]
         User((User/Owner))
-        Tailscale[Tailscale IP / Remote Access]:::infrastructure
-        ProdURL[Next.js UI :6969]
-        Stockbit[Stockbit Insider Verification]:::external
+        Tailscale[Tailscale / Remote Access]:::infrastructure
+        ProdURL[Next.js Dashboard :6969]
+        TickerDrawer[Institutional Drawer: Map/Absorption]:::pm
+        Stockbit[Stockbit Verification]:::external
     end
 
-    subgraph Control_Plane [Command & Control]
-        Supervisor[Gemini CLI / Senior Architect]:::supervisor
+    subgraph Control_Plane [Command \u0026 Control]
+        Supervisor[Gemini CLI / Lead Architect]:::supervisor
         PM[Project Manager Agent]:::pm
     end
 
-    subgraph Intelligence_Layer [Data & Logic Design]
-        BA[Business Analyst Agent]:::ba
-        Scoring[Smart Scoring & Cluster Logic]
+    subgraph Intelligence_Layer [Data \u0026 Signal Logic]
+        BA[Business Analyst / Researcher]:::ba
+        Scoring[Smart Scoring \u0026 Cluster Engine]
+        AbsRatio[Absorption Ratio Math]:::ba
+        PriceMap[Accumulation Price Map Logic]:::ba
     end
 
-    subgraph Execution_Core [Engineering & Automation]
+    subgraph Execution_Core [Engineering \u0026 API Delivery]
         DEV[Developer Agent]:::dev
         API[FastAPI Backend :8000]
-        Scraper[Multi-threaded Scraper]
+        Scraper[Multi-threaded PDF/HTML Scraper]
+        YFinance[yfinance Market Data API]:::external
         Scheduler[Randomized Scheduler 1AM-5AM]:::infrastructure
     end
 
-    subgraph Data_Layer [Source & Storage]
+    subgraph Data_Layer [Source \u0026 Storage]
         IDX_API[(IDX 2026 API / PDF)]
         DB[(PostgreSQL)]
     end
 
-    subgraph Validation_Layer [Quality & Resilience]
+    subgraph Validation_Layer [Quality \u0026 Integrity]
         QA[QA Engineer Agent]:::qa
     end
 
     %% Workflow Flow
     User -->|Access via| Tailscale
-    Tailscale -->|Browser Execution| ProdURL
-    ProdURL -->|Verify Transactions| Stockbit
+    Tailscale -->|Browser| ProdURL
+    ProdURL -->|Inspect Ticker| TickerDrawer
+    TickerDrawer -->|Execution| Stockbit
     
     User -->|Directives| Supervisor
     Supervisor -->|Plan Mode| PM
     PM -->|Features| BA
     BA -->|Data Logic| Scoring
-    Scoring -->|Schema| DEV
+    BA -->|Institutional Specs| AbsRatio
+    BA -->|Visual Logic| PriceMap
+    
+    PriceMap -->|API Schema| DEV
+    AbsRatio -->|API Schema| DEV
+    
     DEV -->|Implement| API
-    DEV -->|Optimize| Scraper
+    DEV -->|Ingestion| Scraper
+    
+    API <-->|Fetch Price History| YFinance
+    API <-->|Serve Aggregates| DB
     Scraper -->|Ingest| IDX_API
     Scraper -->|Store| DB
-    API <-->|Serve| DB
     
     Scheduler -->|Trigger| Scraper
     
     %% QA Loop
-    QA -->|Connectivity Tests| Tailscale
-    QA -->|Data Accuracy| DB
+    QA -->|Institutional Data Tests| API
+    QA -->|Visual Regression| TickerDrawer
+    QA -->|Schema Integrity| DB
     QA -->|UAT Reports| Supervisor
 
     %% Connectivity
     ProdURL <-->|NEXT_PUBLIC_API_URL| API
 
     %% Agent Duties
-    subgraph Agent_Specialization [Finalized Duties]
+    subgraph Agent_Specialization [Current Sprint Roles]
         direction LR
-        PM_D[Roadmap / UX / Approval]:::pm
-        BA_D[Ticker Expansion / NLP]:::ba
-        DEV_D[Docker / Playwright / FastAPI]:::dev
-        QA_D[Regression / UAT / Network]:::qa
+        PM_D[UX / Drawer Workflow / Approval]:::pm
+        BA_D[Liquidity Math / Price Map Research]:::ba
+        DEV_D[FastAPI / yfinance / Next.js Drawer]:::dev
+        QA_D[Absorption Logic Verification / UAT]:::qa
     end

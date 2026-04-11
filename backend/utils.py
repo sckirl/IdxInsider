@@ -51,6 +51,50 @@ def get_market_metadata(ticker: str) -> Dict[str, Any]:
         print(f"Error fetching market data for {ticker}: {e}")
         return {"rvol": 1.0, "price_history": []}
 
+def get_30d_adv(ticker: str) -> Tuple[float, float]:
+    """
+    Fetch 30-day Average Daily Volume (ADV) and Current Price for a ticker.
+    Returns (30d_adv, current_price)
+    """
+    import yfinance as yf
+    try:
+        symbol = f"{ticker.upper()}.JK"
+        stock = yf.Ticker(symbol)
+        hist = stock.history(period="1mo")
+        if hist.empty:
+            return 0.0, 0.0
+        
+        adv = hist['Volume'].mean()
+        current_price = hist['Close'].iloc[-1]
+        return float(adv), float(current_price)
+    except Exception as e:
+        print(f"Error fetching ADV for {ticker}: {e}")
+        return 0.0, 0.0
+
+def get_insider_stats_for_absorption(ticker: str, db) -> Dict[str, Any]:
+    """
+    Calculate total shares bought by insiders in the last 90 days.
+    """
+    from .models import InsiderTransaction
+    from sqlalchemy import func
+    import datetime
+    
+    ninety_days_ago = datetime.date.today() - datetime.timedelta(days=90)
+    
+    stats = db.query(
+        func.sum(InsiderTransaction.shares).label("total_shares"),
+        func.count(InsiderTransaction.id).label("transaction_count")
+    ).filter(
+        InsiderTransaction.ticker == ticker,
+        InsiderTransaction.transaction_type == "BUY",
+        InsiderTransaction.date >= ninety_days_ago
+    ).first()
+    
+    return {
+        "total_shares": float(stats.total_shares or 0),
+        "transaction_count": int(stats.transaction_count or 0)
+    }
+
 def get_price_on_date(ticker: str, date: datetime.date) -> float:
     """
     Fetch the historical closing price of a stock on a specific date using yfinance.
@@ -110,10 +154,10 @@ def calculate_score(transaction: Dict[str, Any], db=None) -> Tuple[int, List[str
     ticker = transaction.get("ticker", "")
     t_date = transaction.get("date")
 
-    if t_type == "GIFT":
-        return 0, ["Gift/Inheritance (0)"]
+    if t_type in ["GIFT", "INHERITANCE", "BONUS", "DIVIDEND", "SPLIT", "REVERSE_SPLIT", "REPO"]:
+        return 0, [f"{t_type.capitalize()} (0)"]
 
-    if t_type == "BUY":
+    if t_type in ["BUY", "EXERCISE"]:
         # Role Weight
         role_weights = {
             "DIREKTUR_UTAMA": 5,
@@ -128,6 +172,10 @@ def calculate_score(transaction: Dict[str, Any], db=None) -> Tuple[int, List[str
         if r_weight > 0:
             score += r_weight
             reasons.append(f"{role.replace('_', ' ')} Buy (+{r_weight})")
+        
+        if t_type == "EXERCISE":
+            score += 1
+            reasons.append("Option Exercise (+1)")
 
         # Value Weight
         if value >= 10_000_000_000:
@@ -152,9 +200,9 @@ def calculate_score(transaction: Dict[str, Any], db=None) -> Tuple[int, List[str
             reasons.append("Direct Ownership (+1)")
             
         ownership_pct = transaction.get("ownership_change_pct") or 0
-        if ownership_pct > 0.1:
+        if ownership_pct > 10.0:
             score += 2
-            reasons.append("Significant Stake Increase (+2)")
+            reasons.append("Significant Stake Increase >10% (+2)")
         
         # Double-Conviction (Buyback)
         if transaction.get("is_buyback", False):
@@ -167,14 +215,15 @@ def calculate_score(transaction: Dict[str, Any], db=None) -> Tuple[int, List[str
             score += 2
             reasons.append(f"High RVOL {rvol}x (+2)")
         
-        # Cluster Buy Logic
+        # Cluster Buy Logic (BUY or EXERCISE)
         if db and ticker and t_date:
             from .models import InsiderTransaction
+            from sqlalchemy import or_
             seven_days_ago = t_date - datetime.timedelta(days=7)
             
             other_insiders_count = db.query(InsiderTransaction.insider_name).filter(
                 InsiderTransaction.ticker == ticker,
-                InsiderTransaction.transaction_type == "BUY",
+                InsiderTransaction.transaction_type.in_(["BUY", "EXERCISE"]),
                 InsiderTransaction.date >= seven_days_ago,
                 InsiderTransaction.date <= t_date,
                 InsiderTransaction.insider_name != transaction.get("insider_name")

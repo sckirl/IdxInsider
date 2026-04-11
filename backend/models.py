@@ -31,6 +31,7 @@ class InsiderTransaction(Base):
     is_buyback = Column(Boolean, default=False)
     insider_win_rate = Column(Float) # Success rate percentage
     price_history = Column(Text) # JSON string of last 5 days
+    date_inferred = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     def __repr__(self):

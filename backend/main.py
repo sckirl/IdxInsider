@@ -11,7 +11,12 @@ from .database import get_db, engine, SessionLocal
 from .models import InsiderTransaction, Base
 from . import models
 from .scraper import run_scraper
-from .utils import normalize_role, calculate_score
+from .utils import (
+    normalize_role, 
+    calculate_score, 
+    get_30d_adv, 
+    get_insider_stats_for_absorption
+)
 
 import os
 
@@ -155,3 +160,64 @@ def get_insider_clusters(
     # Sort clusters by insider count (high to low)
     clusters.sort(key=lambda x: x["insider_count"], reverse=True)
     return clusters
+
+@app.get("/insider/accumulation/{ticker}")
+def get_accumulation_map(ticker: str, db: Session = Depends(get_db)):
+    """
+    Groups historical insider trades by price and sums up buy/sell shares.
+    """
+    from sqlalchemy import func
+    
+    # 1. Fetch transactions for the ticker
+    # We round price to nearest 10 for mapping, or just use raw price
+    # For IDX, some prices are large, some small. Let's use raw price first.
+    results = db.query(
+        InsiderTransaction.price,
+        func.sum(InsiderTransaction.shares).label("total_shares"),
+        InsiderTransaction.transaction_type
+    ).filter(
+        InsiderTransaction.ticker == ticker.upper()
+    ).group_by(
+        InsiderTransaction.price,
+        InsiderTransaction.transaction_type
+    ).all()
+    
+    # 2. Format result
+    price_map = []
+    for price, shares, t_type in results:
+        price_map.append({
+            "price": float(price or 0),
+            "shares": float(shares or 0),
+            "type": t_type
+        })
+    
+    # Sort by price descending (top to bottom)
+    price_map.sort(key=lambda x: x["price"], reverse=True)
+    return price_map
+
+@app.get("/insider/absorption/{ticker}")
+async def get_absorption_ratio(ticker: str, db: Session = Depends(get_db)):
+    """
+    Calculates the Absorption Ratio: 
+    (Total Shares Bought by Insiders / 30-Day Avg Daily Volume)
+    """
+    # 1. Fetch insider stats (last 90 days)
+    insider_stats = get_insider_stats_for_absorption(ticker.upper(), db)
+    
+    # 2. Fetch market volume (30-day ADV)
+    # This is a network call, we use asyncio.to_thread if needed or just call it
+    adv_30d, current_price = await asyncio.to_thread(get_30d_adv, ticker.upper())
+    
+    # 3. Calculate ratio
+    ratio = 0.0
+    if adv_30d > 0:
+        ratio = insider_stats["total_shares"] / adv_30d
+        
+    return {
+        "ticker": ticker.upper(),
+        "total_shares_bought": insider_stats["total_shares"],
+        "adv_30d": adv_30d,
+        "absorption_ratio": float(round(ratio, 4)),
+        "current_price": current_price,
+        "transaction_count": insider_stats["transaction_count"]
+    }

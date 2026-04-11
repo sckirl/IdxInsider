@@ -54,10 +54,10 @@ def extract_transaction_date(text: str) -> Optional[datetime.date]:
     text = text.replace("\n", " ")
     
     date_patterns = [
-        # Indonesian: Tanggal Transaksi: Senin, 06 April 2026
-        r"(?:Tanggal Transaksi|Date of Transaction)\s*[:]?\s*(?:[A-Za-z]+,?\s*)?(\d{1,2}[\/\-\.\s](?:Jan(?:uari)?|Feb(?:ruari)?|Mar(?:et)?|Apr(?:il)?|Mei|Jun(?:i)?|Jul(?:i)?|Agu(?:stus)?|Sep(?:tember)?|Okt(?:ober)?|Nov(?:ember)?|Des(?:ember)?)\s*\d{4})",
+        # Indonesian: Tanggal Transaksi, Waktu Pelaksanaan, Tanggal Perolehan, etc.
+        r"(?:Tanggal Transaksi|Waktu Pelaksanaan|Tanggal Perolehan|Tanggal Penjualan|Tanggal Perubahan|Tanggal Pelaksanaan|Date of Transaction)\s*[:]?\s*(?:[A-Za-z]+,?\s*)?(\d{1,2}[\/\-\.\s](?:Jan(?:uari)?|Feb(?:ruari)?|Mar(?:et)?|Apr(?:il)?|Mei|Jun(?:i)?|Jul(?:i)?|Agu(?:stus)?|Sep(?:tember)?|Okt(?:ober)?|Nov(?:ember)?|Des(?:ember)?)\s*\d{4})",
         # Slash format: 06/04/2026
-        r"(?:Tanggal Transaksi|Date of Transaction)\s*[:]?\s*(?:[A-Za-z]+,?\s*)?(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})",
+        r"(?:Tanggal Transaksi|Waktu Pelaksanaan|Tanggal Perolehan|Tanggal Penjualan|Tanggal Perubahan|Tanggal Pelaksanaan|Date of Transaction)\s*[:]?\s*(?:[A-Za-z]+,?\s*)?(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})",
         # English: April 10, 2026
         r"(\d{1,2}[\/\-\.\s](?:January|February|March|April|May|June|July|August|September|October|November|December)\s*\d{4})",
         r"([A-Z]{3,10}\s+\d{1,2},\s+\d{4})"
@@ -116,6 +116,7 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
             except: pass
         
         final_date = t_date if t_date else filing_date
+        date_inferred = (t_date is None)
 
         # Insider Name & Role
         insider_name = "Unknown"
@@ -279,6 +280,7 @@ def parse_pdf_content(pdf_bytes: bytes, source_url: str, filing_date_str: str) -
             "ownership_before": float(ownership_before),
             "ownership_after": float(ownership_after),
             "ownership_change_pct": float(change_pct),
+            "date_inferred": date_inferred,
             "source_url": source_url
         })
     except Exception as e:

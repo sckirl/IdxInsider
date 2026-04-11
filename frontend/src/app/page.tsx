@@ -37,6 +37,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isScraping, setIsScraping] = useState(false);
+  const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   
   // Cluster Filters
   const [minInsiders, setMinInsiders] = useState(2);
@@ -208,8 +209,8 @@ export default function Home() {
                   return (
                     <tr key={row.id} className="hover:bg-[#1C2128] transition-colors group">
                       <td className="p-3 text-[#8B949E] whitespace-nowrap">{row.date}</td>
-                      <td className="p-3">
-                        <div className="flex flex-col">
+                      <td className="p-3" onClick={() => setSelectedTicker(row.ticker)} title="Click for Institutional Intelligence">
+                        <div className="flex flex-col cursor-pointer hover:underline">
                           <span className="font-bold text-blue-400">{row.ticker}</span>
                           {row.is_buyback && (
                             <span className="text-[8px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1 rounded-sm mt-1 w-fit font-bold">
@@ -275,8 +276,8 @@ export default function Home() {
             {clusters.map((cluster) => (
               <div key={cluster.ticker} className="bg-[#161B22] border border-[#30363D] rounded-lg overflow-hidden flex flex-col hover:border-blue-500/50 transition-colors">
                 <div className="p-4 border-b border-[#30363D] flex justify-between items-start bg-[#0D1117]">
-                  <div>
-                    <h3 className="text-xl font-bold text-blue-400">{cluster.ticker}</h3>
+                  <div className="cursor-pointer group/ticker" onClick={() => setSelectedTicker(cluster.ticker)}>
+                    <h3 className="text-xl font-bold text-blue-400 group-hover/ticker:underline">{cluster.ticker}</h3>
                     <p className="text-[10px] text-[#8B949E] uppercase tracking-widest mt-1">High-Conviction Accumulation</p>
                   </div>
                   <div className="text-right">
@@ -323,6 +324,164 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      {/* Ticker Drawer Sidebar */}
+      {selectedTicker && (
+        <TickerDrawer 
+          ticker={selectedTicker} 
+          onClose={() => setSelectedTicker(null)} 
+        />
+      )}
+    </div>
+  );
+}
+
+function TickerDrawer({ ticker, onClose }: { ticker: string, onClose: () => void }) {
+  const [loading, setLoading] = useState(true);
+  const [absorption, setAbsorption] = useState<any>(null);
+  const [accumulation, setAccumulation] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function fetchTickerData() {
+      setLoading(true);
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+        const [absRes, accRes] = await Promise.all([
+          fetch(`${apiUrl}/insider/absorption/${ticker}`),
+          fetch(`${apiUrl}/insider/accumulation/${ticker}`)
+        ]);
+        
+        if (absRes.ok) setAbsorption(await absRes.json());
+        if (accRes.ok) setAccumulation(await accRes.json());
+      } catch (err) {
+        console.error("Drawer fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchTickerData();
+  }, [ticker]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+        onClick={onClose}
+      />
+      
+      {/* Sidebar Panel */}
+      <div className="relative w-full max-w-md bg-[#0D1117] border-l border-[#30363D] shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-300">
+        <header className="p-6 border-b border-[#30363D] flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-black text-blue-400 tracking-tighter">{ticker}</h2>
+            <p className="text-[10px] text-[#8B949E] uppercase tracking-widest font-bold">Institutional Intelligence Engine</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-[#21262D] rounded-full text-[#8B949E] transition-colors">
+            ✕
+          </button>
+        </header>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center h-64 space-y-4">
+              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-xs text-[#8B949E] font-mono">CALCULATING ABSORPTION...</p>
+            </div>
+          ) : (
+            <>
+              {/* Absorption Ratio Card */}
+              <section className="bg-[#161B22] border border-[#30363D] rounded-xl p-5 shadow-inner">
+                <div className="flex justify-between items-start mb-4">
+                  <h3 className="text-xs font-bold text-[#8B949E] uppercase tracking-wider">Absorption Ratio</h3>
+                  <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20">90-Day Conviction</span>
+                </div>
+                
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-5xl font-black tracking-tighter ${
+                    (absorption?.absorption_ratio || 0) >= 1.0 ? 'text-green-400' : 'text-[#F0F6FC]'
+                  }`}>
+                    {absorption?.absorption_ratio?.toFixed(2)}x
+                  </span>
+                  <span className="text-xs text-[#8B949E] font-medium">of 30D ADV</span>
+                </div>
+                
+                <p className="mt-4 text-[11px] text-[#8B949E] leading-relaxed">
+                  Insiders have absorbed <span className="text-[#F0F6FC] font-bold">
+                    {new Intl.NumberFormat('id-ID').format(absorption?.total_shares_bought || 0)}
+                  </span> shares against a 30-day average daily volume of <span className="text-[#F0F6FC] font-bold">
+                    {new Intl.NumberFormat('id-ID').format(absorption?.adv_30d || 0)}
+                  </span>.
+                </p>
+                
+                {(absorption?.absorption_ratio || 0) >= 1.0 && (
+                  <div className="mt-4 p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
+                    <p className="text-[10px] text-green-400 font-bold uppercase tracking-tight flex items-center gap-2">
+                      <span>⚡</span> High Conviction Signal: Supply Choke Detected
+                    </p>
+                  </div>
+                )}
+              </section>
+
+              {/* Accumulation Price Map */}
+              <section>
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xs font-bold text-[#8B949E] uppercase tracking-wider">Accumulation Price Map</h3>
+                  <span className="text-[10px] text-blue-400 font-mono">Live Price: Rp {absorption?.current_price || 'N/A'}</span>
+                </div>
+                
+                <div className="relative border-l border-[#30363D] ml-2 pl-4 py-2">
+                  {accumulation.length === 0 ? (
+                    <p className="text-xs text-[#8B949E] py-10 text-center">No historical price clusters found.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {accumulation.map((node, i) => {
+                        const isCurrent = Math.abs(node.price - absorption?.current_price) / node.price < 0.01;
+                        const maxShares = Math.max(...accumulation.map(n => n.shares));
+                        const widthPct = (node.shares / maxShares) * 100;
+
+                        return (
+                          <div key={i} className={`group relative flex flex-col gap-1 transition-all ${isCurrent ? 'scale-[1.02]' : 'opacity-80 hover:opacity-100'}`}>
+                            <div className="flex justify-between text-[10px] font-mono">
+                              <span className={`font-bold ${isCurrent ? 'text-blue-400' : 'text-[#8B949E]'}`}>
+                                Rp {new Intl.NumberFormat('id-ID').format(node.price)}
+                                {isCurrent && <span className="ml-2 text-[8px] bg-blue-500 text-white px-1 rounded">AT MARKET</span>}
+                              </span>
+                              <span className="text-[#8B949E]">{new Intl.NumberFormat('id-ID').format(node.shares)} SHRS</span>
+                            </div>
+                            <div className="h-4 w-full bg-[#161B22] rounded-sm overflow-hidden border border-[#30363D]">
+                              <div 
+                                className={`h-full transition-all duration-1000 ${
+                                  node.type === 'BUY' ? 'bg-green-500/40 border-r-2 border-green-400' : 'bg-red-500/40 border-r-2 border-red-400'
+                                }`}
+                                style={{ width: `${widthPct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  {/* Vertical Price Marker (Current) */}
+                  <div className="absolute top-0 bottom-0 left-0 w-0.5 bg-blue-500/20 pointer-events-none" />
+                </div>
+              </section>
+
+              {/* Action */}
+              <div className="pt-6">
+                 <a 
+                    href={`https://stockbit.com/symbol/${ticker}/insider`}
+                    target="_blank"
+                    className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 text-sm"
+                  >
+                    Execute Trade on Stockbit ↗
+                  </a>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
